@@ -17,7 +17,8 @@ class StakeAPI:
     
     def __init__(
         self,
-        api_key: Optional[str] = None,
+        access_token: Optional[str] = None,
+        session_cookie: Optional[str] = None,
         base_url: str = "https://stake.com",
         timeout: int = 30,
         rate_limit: int = 10,
@@ -26,18 +27,20 @@ class StakeAPI:
         Initialize the StakeAPI client.
         
         Args:
-            api_key: Your stake.com API key
+            access_token: Your stake.com access token (x-access-token header)
+            session_cookie: Session cookie for authentication
             base_url: Base URL for the API
             timeout: Request timeout in seconds
             rate_limit: Maximum requests per second
         """
-        self.api_key = api_key
+        self.access_token = access_token
+        self.session_cookie = session_cookie
         self.base_url = base_url
         self.timeout = timeout
         self.rate_limit = rate_limit
         
         self._session: Optional[aiohttp.ClientSession] = None
-        self._auth_manager = AuthManager(api_key)
+        self._auth_manager = AuthManager(access_token)
         
     async def __aenter__(self):
         """Async context manager entry."""
@@ -51,17 +54,35 @@ class StakeAPI:
     async def _create_session(self):
         """Create aiohttp session with proper headers."""
         headers = {
-            "User-Agent": "StakeAPI/1.0.0",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
+            "Accept": "application/graphql+json, application/json",
+            "Accept-Language": "en-US,en;q=0.9",
             "Content-Type": "application/json",
+            "Origin": "https://stake.com",
+            "Referer": "https://stake.com/",
+            "Sec-Ch-Ua": '"Chromium";v="135", "Not-A.Brand";v="8"',
+            "Sec-Ch-Ua-Mobile": "?0",
+            "Sec-Ch-Ua-Platform": '"Windows"',
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-origin",
+            "X-Language": "en",
         }
         
-        if self.api_key:
-            headers.update(await self._auth_manager.get_auth_headers())
+        if self.access_token:
+            headers["X-Access-Token"] = self.access_token
+            
+        # Set up cookies if session cookie is provided
+        jar = None
+        if self.session_cookie:
+            jar = aiohttp.CookieJar()
+            jar.update_cookies({"session": self.session_cookie})
             
         timeout = aiohttp.ClientTimeout(total=self.timeout)
         self._session = aiohttp.ClientSession(
             headers=headers,
-            timeout=timeout
+            timeout=timeout,
+            cookie_jar=jar
         )
         
     async def close(self):
@@ -105,7 +126,7 @@ class StakeAPI:
                 response_data = await response.json()
                 
                 if response.status == 401:
-                    raise AuthenticationError("Invalid API key or unauthorized access")
+                    raise AuthenticationError("Invalid access token or unauthorized access")
                 elif response.status == 429:
                     raise RateLimitError("Rate limit exceeded")
                 elif response.status >= 400:
@@ -115,6 +136,46 @@ class StakeAPI:
                 
         except aiohttp.ClientError as e:
             raise StakeAPIError(f"Request failed: {e}")
+    
+    async def _graphql_request(
+        self,
+        query: str,
+        variables: Optional[Dict[str, Any]] = None,
+        operation_name: Optional[str] = None
+    ) -> Dict[Any, Any]:
+        """
+        Make a GraphQL request to the stake.com API.
+        
+        Args:
+            query: GraphQL query string
+            variables: Query variables
+            operation_name: Operation name
+            
+        Returns:
+            GraphQL response data
+            
+        Raises:
+            StakeAPIError: For API errors
+            AuthenticationError: For authentication errors
+        """
+        payload = {
+            "query": query,
+        }
+        
+        if variables:
+            payload["variables"] = variables
+            
+        if operation_name:
+            payload["operationName"] = operation_name
+            
+        response = await self._request("POST", "/_api/graphql", data=payload)
+        
+        # Check for GraphQL errors
+        if "errors" in response:
+            error_messages = [error.get("message", "Unknown error") for error in response["errors"]]
+            raise StakeAPIError(f"GraphQL errors: {', '.join(error_messages)}")
+            
+        return response.get("data", {})
             
     # Casino Methods
     async def get_casino_games(self, category: Optional[str] = None) -> List[Game]:
@@ -177,15 +238,65 @@ class StakeAPI:
         data = await self._request("GET", Endpoints.USER_PROFILE)
         return User.from_dict(data)
         
-    async def get_user_balance(self) -> Dict[str, float]:
+    async def get_user_balance(self) -> Dict[str, Dict[str, float]]:
         """
-        Get user account balance.
+        Get user account balance using GraphQL.
         
         Returns:
-            Balance information by currency
+            Balance information by currency with available and vault amounts
+            Format: {
+                "available": {"btc": 0.001, "usd": 100.0},
+                "vault": {"btc": 0.0, "usd": 0.0}
+            }
         """
-        data = await self._request("GET", Endpoints.USER_BALANCE)
-        return data.get("balances", {})
+        query = """
+        query UserBalances {
+          user {
+            id
+            balances {
+              available {
+                amount
+                currency
+                __typename
+              }
+              vault {
+                amount
+                currency
+                __typename
+              }
+              __typename
+            }
+            __typename
+          }
+        }
+        """
+        
+        data = await self._graphql_request(query, operation_name="UserBalances")
+        
+        # Process the response to create a more convenient format
+        result = {
+            "available": {},
+            "vault": {}
+        }
+        
+        if "user" in data and data["user"] and "balances" in data["user"]:
+            balances = data["user"]["balances"]
+            
+            # Process available balances
+            if "available" in balances:
+                for balance in balances["available"]:
+                    currency = balance.get("currency", "").lower()
+                    amount = float(balance.get("amount", 0))
+                    result["available"][currency] = amount
+            
+            # Process vault balances
+            if "vault" in balances:
+                for balance in balances["vault"]:
+                    currency = balance.get("currency", "").lower()
+                    amount = float(balance.get("amount", 0))
+                    result["vault"][currency] = amount
+        
+        return result
         
     # Betting Methods
     async def place_bet(self, bet_data: Dict[str, Any]) -> Bet:

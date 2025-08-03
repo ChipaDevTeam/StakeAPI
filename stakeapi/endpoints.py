@@ -1,10 +1,13 @@
-"""API endpoints for StakeAPI."""
+"""API endpoints and GraphQL queries for StakeAPI."""
 
 
 class Endpoints:
     """API endpoint constants."""
     
-    # Base API path
+    # GraphQL endpoint
+    GRAPHQL = "/_api/graphql"
+    
+    # Legacy REST endpoints (if any still exist)
     API_BASE = "/api/v1"
     
     # Authentication
@@ -43,3 +46,153 @@ class Endpoints:
     # Promotions
     PROMOTIONS = f"{API_BASE}/promotions"
     PROMOTION_DETAILS = f"{API_BASE}/promotions/{{promo_id}}"
+
+
+class GraphQLQueries:
+    """GraphQL query constants for stake.com API."""
+    
+    USER_BALANCES = """
+    query UserBalances {
+      user {
+        id
+        balances {
+          available {
+            amount
+            currency
+            __typename
+          }
+          vault {
+            amount
+            currency
+            __typename
+          }
+          __typename
+        }
+        __typename
+      }
+    }
+    """
+    
+    USER_PROFILE = """
+    query UserProfile {
+      user {
+        id
+        name
+        email
+        isEmailVerified
+        country
+        level
+        statistics {
+          __typename
+        }
+        __typename
+      }
+    }
+    """
+    
+    CASINO_GAMES = """
+    query CasinoGames($first: Int, $after: String, $categorySlug: String) {
+      casinoGames(first: $first, after: $after, categorySlug: $categorySlug) {
+        edges {
+          node {
+            id
+            name
+            slug
+            provider {
+              name
+              __typename
+            }
+            thumb
+            category {
+              name
+              slug
+              __typename
+            }
+            __typename
+          }
+          __typename
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+          __typename
+        }
+        __typename
+      }
+    }
+    """
+    
+    SPORTS_EVENTS = """
+    query SportsEvents($first: Int, $sportSlug: String) {
+      sportsEvents(first: $first, sportSlug: $sportSlug) {
+        edges {
+          node {
+            id
+            name
+            startTime
+            sport {
+              name
+              slug
+              __typename
+            }
+            league {
+              name
+              slug
+              __typename
+            }
+            competitors {
+              name
+              __typename
+            }
+            markets {
+              name
+              outcomes {
+                name
+                odds
+                __typename
+              }
+              __typename
+            }
+            __typename
+          }
+          __typename
+        }
+        __typename
+      }
+    }
+    """
+    
+    BET_HISTORY = """
+    query BetHistory($first: Int, $after: String) {
+      user {
+        bets(first: $first, after: $after) {
+          edges {
+            node {
+              id
+              amount
+              currency
+              multiplier
+              payout
+              createdAt
+              updatedAt
+              outcome
+              game {
+                name
+                slug
+                __typename
+              }
+              __typename
+            }
+            __typename
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
+            __typename
+          }
+          __typename
+        }
+        __typename
+      }
+    }
+    """

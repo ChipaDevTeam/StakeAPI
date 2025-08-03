@@ -24,16 +24,33 @@ pip install stakeapi
 ## Quick Start
 
 ```python
+import asyncio
 from stakeapi import StakeAPI
 
-# Initialize the API client
-client = StakeAPI(api_key="your_api_key")
+async def main():
+    # Initialize with access token from stake.com
+    async with StakeAPI(access_token="your_access_token") as client:
+        # Get account balance
+        balance = await client.get_user_balance()
+        print(f"Available balance: {balance['available']}")
+        print(f"Vault balance: {balance['vault']}")
 
-# Get casino games
-games = await client.get_casino_games()
+asyncio.run(main())
+```
 
-# Get sports events
-events = await client.get_sports_events()
+## Getting Your Access Token
+
+1. **Log in to stake.com** in your browser
+2. **Open Developer Tools** (F12)
+3. **Go to the Network tab**
+4. **Make any action** that triggers a request (like checking balance)
+5. **Find a GraphQL request** to `/_api/graphql`
+6. **Right-click** → **Copy as cURL**
+7. **Extract the x-access-token** from the cURL command
+
+The access token will be in a header like:
+```
+-H "x-access-token: your_token_here"
 ```
 
 ## Documentation

@@ -11,18 +11,16 @@ import json
 class AuthManager:
     """Handles authentication for StakeAPI."""
     
-    def __init__(self, api_key: Optional[str] = None, api_secret: Optional[str] = None):
+    def __init__(self, access_token: Optional[str] = None, session_cookie: Optional[str] = None):
         """
         Initialize authentication manager.
         
         Args:
-            api_key: API key from stake.com
-            api_secret: API secret from stake.com
+            access_token: Access token from stake.com (x-access-token)
+            session_cookie: Session cookie for authentication
         """
-        self.api_key = api_key
-        self.api_secret = api_secret
-        self._access_token: Optional[str] = None
-        self._refresh_token: Optional[str] = None
+        self.access_token = access_token
+        self.session_cookie = session_cookie
         self._token_expires_at: Optional[float] = None
         
     async def get_auth_headers(self) -> Dict[str, str]:
@@ -34,52 +32,45 @@ class AuthManager:
         """
         headers = {}
         
-        if self.api_key:
-            headers["X-API-Key"] = self.api_key
-            
-        if self._access_token:
-            headers["Authorization"] = f"Bearer {self._access_token}"
+        if self.access_token:
+            headers["X-Access-Token"] = self.access_token
             
         return headers
-        
-    def generate_signature(self, method: str, endpoint: str, body: str = "") -> str:
+    
+    def get_cookies(self) -> Dict[str, str]:
         """
-        Generate HMAC signature for authenticated requests.
+        Get authentication cookies.
         
-        Args:
-            method: HTTP method
-            endpoint: API endpoint
-            body: Request body
-            
         Returns:
-            HMAC signature
+            Dictionary of cookies
         """
-        if not self.api_secret:
-            return ""
+        cookies = {}
+        
+        if self.session_cookie:
+            cookies["session"] = self.session_cookie
             
-        timestamp = str(int(time.time()))
-        message = f"{timestamp}{method.upper()}{endpoint}{body}"
+        return cookies
         
-        signature = hmac.new(
-            self.api_secret.encode(),
-            message.encode(),
-            hashlib.sha256
-        ).hexdigest()
-        
-        return signature
-        
-    def set_tokens(self, access_token: str, refresh_token: str, expires_in: int):
+    def set_access_token(self, access_token: str, expires_in: Optional[int] = None):
         """
-        Set authentication tokens.
+        Set access token.
         
         Args:
             access_token: Access token
-            refresh_token: Refresh token
             expires_in: Token expiration time in seconds
         """
-        self._access_token = access_token
-        self._refresh_token = refresh_token
-        self._token_expires_at = time.time() + expires_in
+        self.access_token = access_token
+        if expires_in:
+            self._token_expires_at = time.time() + expires_in
+        
+    def set_session_cookie(self, session_cookie: str):
+        """
+        Set session cookie.
+        
+        Args:
+            session_cookie: Session cookie value
+        """
+        self.session_cookie = session_cookie
         
     def is_token_expired(self) -> bool:
         """
@@ -89,13 +80,57 @@ class AuthManager:
             True if token is expired or about to expire
         """
         if not self._token_expires_at:
-            return True
+            return False  # No expiration set, assume valid
             
         # Consider token expired 5 minutes before actual expiration
         return time.time() >= (self._token_expires_at - 300)
         
     def clear_tokens(self):
         """Clear stored authentication tokens."""
-        self._access_token = None
-        self._refresh_token = None
+        self.access_token = None
+        self.session_cookie = None
         self._token_expires_at = None
+        
+    @staticmethod
+    def extract_access_token_from_curl(curl_command: str) -> Optional[str]:
+        """
+        Extract access token from curl command.
+        
+        Args:
+            curl_command: Curl command string
+            
+        Returns:
+            Extracted access token or None
+        """
+        import re
+        
+        # Look for x-access-token header
+        pattern = r'-H\s+["\']x-access-token:\s*([^"\']+)["\']'
+        match = re.search(pattern, curl_command, re.IGNORECASE)
+        
+        if match:
+            return match.group(1).strip()
+            
+        return None
+        
+    @staticmethod
+    def extract_session_from_curl(curl_command: str) -> Optional[str]:
+        """
+        Extract session cookie from curl command.
+        
+        Args:
+            curl_command: Curl command string
+            
+        Returns:
+            Extracted session cookie or None
+        """
+        import re
+        
+        # Look for session cookie in -b parameter
+        pattern = r'session=([^;]+)'
+        match = re.search(pattern, curl_command)
+        
+        if match:
+            return match.group(1).strip()
+            
+        return None
