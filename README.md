@@ -1,5 +1,7 @@
 # StakeAPI
 
+**Join our affiliate link**: https://stake.com/?c=WY7953wQ
+
 An unofficial Python API wrapper for stake.com - the online gambling platform.
 
 ## ⚠️ Disclaimer
