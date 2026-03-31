@@ -57,7 +57,7 @@ The access token will be in a header like:
 
 ## Documentation
 
-For detailed documentation, please visit [our docs](docs/).
+For detailed documentation, please visit **[chipadevteam.github.io/StakeAPI](https://chipadevteam.github.io/StakeAPI/)**.
 
 ## Contributing
 
