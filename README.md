@@ -7,7 +7,7 @@ An unofficial Python API wrapper for stake.com - the online gambling platform.
 ## ⚠️ Disclaimer
 
 This is an unofficial API wrapper and is not affiliated with, endorsed by, or connected to stake.com in any way. Use at your own risk and ensure compliance with all applicable laws and regulations in your jurisdiction.
-
+ 
 ## Features
 
 - 🎰 Access to casino games data
