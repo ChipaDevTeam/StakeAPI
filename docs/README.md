@@ -24,7 +24,7 @@ pip install stakeapi
 For development installation:
 
 ```bash
-git clone https://github.com/yourusername/StakeAPI.git
+git clone https://github.com/chipadevteam/StakeAPI.git
 cd StakeAPI
 pip install -e ".[dev]"
 ```
@@ -444,7 +444,7 @@ client = StakeAPI(api_key=api_key)
 
 For issues, questions, or contributions:
 
-- GitHub Issues: [https://github.com/yourusername/StakeAPI/issues](https://github.com/yourusername/StakeAPI/issues)
+- GitHub Issues: [https://github.com/chipadevteam/StakeAPI/issues](https://github.com/chipadevteam/StakeAPI/issues)
 - Documentation: [https://stakeapi.readthedocs.io](https://stakeapi.readthedocs.io)
 - Email: support@stakeapi.dev
 

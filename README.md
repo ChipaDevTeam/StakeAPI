@@ -69,4 +69,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Support
 
-If you encounter any issues, please file them in the [issues section](https://github.com/yourusername/StakeAPI/issues).
+If you encounter any issues, please file them in the [issues section](https://github.com/chipadevteam/StakeAPI/issues).

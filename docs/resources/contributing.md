@@ -20,7 +20,7 @@ Help make StakeAPI even better — contributions of all kinds are welcome!
 ### 1. Fork & Clone
 
 ```bash
-git clone https://github.com/yourusername/StakeAPI.git
+git clone https://github.com/chipadevteam/StakeAPI.git
 cd StakeAPI
 ```
 

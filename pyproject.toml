@@ -52,10 +52,10 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/StakeAPI"
+Homepage = "https://github.com/chipadevteam/StakeAPI"
 Documentation = "https://stakeapi.readthedocs.io"
-Repository = "https://github.com/yourusername/StakeAPI"
-"Bug Tracker" = "https://github.com/yourusername/StakeAPI/issues"
+Repository = "https://github.com/chipadevteam/StakeAPI"
+"Bug Tracker" = "https://github.com/chipadevteam/StakeAPI/issues"
 
 [tool.setuptools_scm]
 write_to = "stakeapi/_version.py"

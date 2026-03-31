@@ -36,7 +36,7 @@ This installs StakeAPI and all required dependencies:
 If you want the latest development version:
 
 ```bash
-git clone https://github.com/yourusername/StakeAPI.git
+git clone https://github.com/chipadevteam/StakeAPI.git
 cd StakeAPI
 pip install -e .
 ```

@@ -13,7 +13,7 @@ The most powerful unofficial Python wrapper for the Stake.com API. Build bots, a
 {: .fs-6 .fw-300 }
 
 [Get Started]({% link getting-started/installation.md %}){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
-[View on GitHub](https://github.com/yourusername/StakeAPI){: .btn .fs-5 .mb-4 .mb-md-0 }
+[View on GitHub](https://github.com/chipadevteam/StakeAPI){: .btn .fs-5 .mb-4 .mb-md-0 }
 [Sign Up on Stake.com](https://stake.com/?c=WY7953wQ){: .btn .btn-green .fs-5 .mb-4 .mb-md-0 }
 
 ---
@@ -112,7 +112,7 @@ StakeAPI supports Python 3.8 and above:
 
 ## Community & Support
 
-- [GitHub Issues](https://github.com/yourusername/StakeAPI/issues) — Report bugs and request features
+- [GitHub Issues](https://github.com/chipadevteam/StakeAPI/issues) — Report bugs and request features
 - [Contributing Guide]({% link resources/contributing.md %}) — Learn how to contribute
 - [Changelog]({% link resources/changelog.md %}) — See what's new
 
