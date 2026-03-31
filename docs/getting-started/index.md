@@ -32,3 +32,4 @@ Each step is covered in detail in the pages below. Most developers are up and ru
 - Basic knowledge of Python and async/await
 
 {% include affiliate-cta.html %}
+{% include discord-cta.html %}

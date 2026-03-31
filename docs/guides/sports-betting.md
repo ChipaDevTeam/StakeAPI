@@ -231,6 +231,7 @@ class SportEvent(BaseModel):
 ```
 
 {% include affiliate-banner.html %}
+{% include discord-cta.html %}
 
 ## Real-World Example: Sports Dashboard
 

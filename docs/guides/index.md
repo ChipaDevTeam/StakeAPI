@@ -33,3 +33,4 @@ In-depth guides for every feature of StakeAPI.
 Each guide includes working code examples you can copy and modify. All examples assume you have a [Stake.com account](https://stake.com/?c=WY7953wQ) and a valid access token.
 
 {% include affiliate-cta.html %}
+{% include discord-cta.html %}

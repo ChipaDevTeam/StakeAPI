@@ -115,8 +115,10 @@ StakeAPI supports Python 3.8 and above:
 - [GitHub Issues](https://github.com/chipadevteam/StakeAPI/issues) — Report bugs and request features
 - [Contributing Guide]({% link resources/contributing.md %}) — Learn how to contribute
 - [Changelog]({% link resources/changelog.md %}) — See what's new
+- [Discord Server](https://discord.gg/PHHfh6UyCb) — Join the community, get help, and share your projects
 
 {% include affiliate-banner.html %}
+{% include discord-cta.html %}
 
 ---
 

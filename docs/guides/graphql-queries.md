@@ -253,6 +253,7 @@ except StakeAPIError as e:
 5. **Name your operations** — Makes debugging much easier
 
 {% include affiliate-banner.html %}
+{% include discord-cta.html %}
 
 ---
 

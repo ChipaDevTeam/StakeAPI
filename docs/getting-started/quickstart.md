@@ -163,6 +163,7 @@ asyncio.run(main())
 ```
 
 {% include affiliate-banner.html %}
+{% include discord-cta.html %}
 
 ## What's Next?
 

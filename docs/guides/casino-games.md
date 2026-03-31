@@ -208,6 +208,7 @@ class Game(BaseModel):
 ```
 
 {% include affiliate-banner.html %}
+{% include discord-cta.html %}
 
 ## Real-World Example: Casino Dashboard
 

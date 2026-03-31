@@ -223,6 +223,7 @@ if auth.is_token_expired():
 ```
 
 {% include affiliate-banner.html %}
+{% include discord-cta.html %}
 
 ## Next Steps
 

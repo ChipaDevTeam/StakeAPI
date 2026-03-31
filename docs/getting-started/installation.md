@@ -137,3 +137,4 @@ Now that StakeAPI is installed, you need a Stake.com account and access token:
 - [Quick Start]({% link getting-started/quickstart.md %}) — Make your first API call
 
 {% include affiliate-banner.html %}
+{% include discord-cta.html %}
