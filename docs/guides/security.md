@@ -198,6 +198,7 @@ logger.info(f"Using token: {token}")
 - [ ] Error messages don't leak sensitive info
 
 {% include affiliate-banner.html %}
+{% include discord-cta.html %}
 
 ---
 

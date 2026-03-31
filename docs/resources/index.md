@@ -26,3 +26,4 @@ Examples, FAQ, troubleshooting, and everything else you need.
 | [Migration Guide]({% link resources/migration.md %}) | Upgrading between versions |
 
 {% include affiliate-cta.html %}
+{% include discord-cta.html %}

@@ -205,6 +205,7 @@ Typical latencies for StakeAPI operations:
 7. **Use WebSockets** for real-time data instead of polling
 
 {% include affiliate-banner.html %}
+{% include discord-cta.html %}
 
 ---
 

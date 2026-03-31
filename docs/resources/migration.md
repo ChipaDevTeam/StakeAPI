@@ -106,6 +106,7 @@ Expected changes:
 - Migration paths will always be documented here
 
 {% include affiliate-banner.html %}
+{% include discord-cta.html %}
 
 ---
 

@@ -175,6 +175,7 @@ Make sure you're using `async with` or calling `await client.close()`. Check you
 For more issues, see the [Troubleshooting Guide]({% link resources/troubleshooting.md %}).
 
 {% include affiliate-banner.html %}
+{% include discord-cta.html %}
 
 ---
 

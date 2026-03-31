@@ -119,3 +119,4 @@ The first public release of StakeAPI — the most comprehensive Python wrapper f
 > Stay updated and be the first to try new features. [Sign up on Stake.com](https://stake.com/?c=WY7953wQ) and start building with StakeAPI today!
 
 {% include affiliate-banner.html %}
+{% include discord-cta.html %}

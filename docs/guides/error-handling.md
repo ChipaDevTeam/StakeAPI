@@ -221,6 +221,7 @@ async def safe_operation(client):
 ```
 
 {% include affiliate-banner.html %}
+{% include discord-cta.html %}
 
 ---
 

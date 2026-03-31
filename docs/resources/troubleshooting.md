@@ -271,6 +271,7 @@ balance = asyncio.run(main())
    - Minimal reproducing code
 
 {% include affiliate-banner.html %}
+{% include discord-cta.html %}
 
 ---
 

@@ -182,6 +182,7 @@ except StakeAPIError as e:
 ```
 
 {% include affiliate-banner.html %}
+{% include discord-cta.html %}
 
 ---
 

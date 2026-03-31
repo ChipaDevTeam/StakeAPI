@@ -184,6 +184,7 @@ session = AuthManager.extract_session_from_curl("""
 | `session_cookie` | `Optional[str]` | Current session cookie |
 
 {% include affiliate-banner.html %}
+{% include discord-cta.html %}
 
 ---
 

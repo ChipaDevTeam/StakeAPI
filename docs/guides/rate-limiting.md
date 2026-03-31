@@ -135,6 +135,7 @@ async def batch_fetch(client, game_ids: list, concurrency: int = 5):
 | Use GraphQL efficiently | Request only needed fields |
 
 {% include affiliate-banner.html %}
+{% include discord-cta.html %}
 
 ---
 

@@ -182,6 +182,7 @@ sanitize_game_name("")                        # ""
 ```
 
 {% include affiliate-banner.html %}
+{% include discord-cta.html %}
 
 ---
 

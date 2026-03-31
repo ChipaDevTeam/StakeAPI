@@ -28,3 +28,4 @@ Complete technical reference for every class, method, and model in StakeAPI.
 All API methods require a valid [Stake.com account](https://stake.com/?c=WY7953wQ) and access token.
 
 {% include affiliate-cta.html %}
+{% include discord-cta.html %}

@@ -189,6 +189,7 @@ endpoint = Endpoints.BET_DETAILS.format(bet_id="bet_123")
 ```
 
 {% include affiliate-banner.html %}
+{% include discord-cta.html %}
 
 ---
 

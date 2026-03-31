@@ -271,6 +271,7 @@ asyncio.run(export_bets_to_csv())
 ```
 
 {% include affiliate-banner.html %}
+{% include discord-cta.html %}
 
 ---
 
