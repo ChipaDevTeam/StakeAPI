@@ -16,8 +16,13 @@ async def main():
         # 1. Get your balance
         balance = await client.get_user_balance()
         print("💰 Your Balance:")
-        for currency, amount in balance["available"].items():
-            if amount > 0:
-                print(f"  {currency.upper()}: {amount}")
+        if balance["available"]:
+            for currency, amount in balance["available"].items():
+                if amount > 0:
+                    print(f"  {currency.upper()}: {amount}")
+            if not any(amount > 0 for amount in balance["available"].values()):
+                print("  (all balances are 0)")
+        else:
+            print("  (no balance data returned)")
 
 asyncio.run(main())
