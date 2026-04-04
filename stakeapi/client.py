@@ -19,6 +19,7 @@ class StakeAPI:
         self,
         access_token: Optional[str] = None,
         session_cookie: Optional[str] = None,
+        cf_clearance: Optional[str] = None,
         base_url: str = "https://stake.com",
         timeout: int = 30,
         rate_limit: int = 10,
@@ -29,12 +30,14 @@ class StakeAPI:
         Args:
             access_token: Your stake.com access token (x-access-token header)
             session_cookie: Session cookie for authentication
+            cf_clearance: Cloudflare clearance cookie (required to bypass Cloudflare protection)
             base_url: Base URL for the API
             timeout: Request timeout in seconds
             rate_limit: Maximum requests per second
         """
         self.access_token = access_token
         self.session_cookie = session_cookie
+        self.cf_clearance = cf_clearance
         self.base_url = base_url
         self.timeout = timeout
         self.rate_limit = rate_limit
@@ -72,11 +75,16 @@ class StakeAPI:
         if self.access_token:
             headers["X-Access-Token"] = self.access_token
             
-        # Set up cookies if session cookie is provided
+        # Set up cookies
         jar = None
+        cookies = {}
         if self.session_cookie:
+            cookies["session"] = self.session_cookie
+        if self.cf_clearance:
+            cookies["cf_clearance"] = self.cf_clearance
+        if cookies:
             jar = aiohttp.CookieJar()
-            jar.update_cookies({"session": self.session_cookie})
+            jar.update_cookies(cookies)
             
         timeout = aiohttp.ClientTimeout(total=self.timeout)
         self._session = aiohttp.ClientSession(
@@ -123,17 +131,28 @@ class StakeAPI:
             async with self._session.request(
                 method, url, params=params, json=data
             ) as response:
-                response_data = await response.json()
-                
-                if response.status == 401:
+                if response.status == 403:
+                    raise StakeAPIError(
+                        "403 Forbidden — Cloudflare is blocking the request. "
+                        "Make sure you provide a valid 'cf_clearance' cookie. "
+                        "To get it: open stake.com in your browser → DevTools (F12) → "
+                        "Application tab → Cookies → copy the 'cf_clearance' value. "
+                        "Then pass it as: StakeAPI(access_token=..., cf_clearance='...')"
+                    )
+                elif response.status == 401:
                     raise AuthenticationError("Invalid access token or unauthorized access")
                 elif response.status == 429:
                     raise RateLimitError("Rate limit exceeded")
-                elif response.status >= 400:
+                
+                response_data = await response.json()
+                
+                if response.status >= 400:
                     raise StakeAPIError(f"API error: {response.status} - {response_data}")
                     
                 return response_data
                 
+        except (StakeAPIError, AuthenticationError, RateLimitError):
+            raise
         except aiohttp.ClientError as e:
             raise StakeAPIError(f"Request failed: {e}")
     
