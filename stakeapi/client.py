@@ -20,6 +20,7 @@ class StakeAPI:
         access_token: Optional[str] = None,
         session_cookie: Optional[str] = None,
         cf_clearance: Optional[str] = None,
+        user_agent: Optional[str] = None,
         base_url: str = "https://stake.com",
         timeout: int = 30,
         rate_limit: int = 10,
@@ -31,6 +32,7 @@ class StakeAPI:
             access_token: Your stake.com access token (x-access-token header)
             session_cookie: Session cookie for authentication
             cf_clearance: Cloudflare clearance cookie (required to bypass Cloudflare protection)
+            user_agent: Your browser's User-Agent (must match the one used to obtain cf_clearance)
             base_url: Base URL for the API
             timeout: Request timeout in seconds
             rate_limit: Maximum requests per second
@@ -38,6 +40,7 @@ class StakeAPI:
         self.access_token = access_token
         self.session_cookie = session_cookie
         self.cf_clearance = cf_clearance
+        self.user_agent = user_agent
         self.base_url = base_url
         self.timeout = timeout
         self.rate_limit = rate_limit
@@ -56,14 +59,14 @@ class StakeAPI:
         
     async def _create_session(self):
         """Create aiohttp session with proper headers."""
+        ua = self.user_agent or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
+            "User-Agent": ua,
             "Accept": "application/graphql+json, application/json",
             "Accept-Language": "en-US,en;q=0.9",
             "Content-Type": "application/json",
             "Origin": "https://stake.com",
             "Referer": "https://stake.com/",
-            "Sec-Ch-Ua": '"Chromium";v="135", "Not-A.Brand";v="8"',
             "Sec-Ch-Ua-Mobile": "?0",
             "Sec-Ch-Ua-Platform": '"Windows"',
             "Sec-Fetch-Dest": "empty",
@@ -75,22 +78,18 @@ class StakeAPI:
         if self.access_token:
             headers["X-Access-Token"] = self.access_token
             
-        # Set up cookies
-        jar = None
+        # Set up cookies — pass directly to session for reliable delivery
         cookies = {}
         if self.session_cookie:
             cookies["session"] = self.session_cookie
         if self.cf_clearance:
             cookies["cf_clearance"] = self.cf_clearance
-        if cookies:
-            jar = aiohttp.CookieJar()
-            jar.update_cookies(cookies)
             
         timeout = aiohttp.ClientTimeout(total=self.timeout)
         self._session = aiohttp.ClientSession(
             headers=headers,
             timeout=timeout,
-            cookie_jar=jar
+            cookies=cookies or None,
         )
         
     async def close(self):
