@@ -32,7 +32,7 @@ def extract_credentials_from_curl():
       -H "sec-fetch-mode: cors" \
       -H "sec-fetch-site: same-origin" \
       -H "user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 OPR/120.0.0.0" \
-      -H "x-access-token: 2775b505cccaee723e5c705ba552fea7c272f6d20f68d7224eb3ba23446ca295e80a9f1ba23a2dccd9699d93a6f819a4" \
+      -H "x-access-token: " \
       -H "x-language: en" \
       --data-raw '{"query":"query UserBalances {\n  user {\n    id\n    balances {\n      available {\n        amount\n        currency\n        __typename\n      }\n      vault {\n        amount\n        currency\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n}\n","operationName":"UserBalances"}'
     '''
