@@ -188,6 +188,10 @@ class StakeAPI:
             
         response = await self._request("POST", "/_api/graphql", data=payload)
         
+        # Debug: print raw response
+        import sys
+        print(f"[DEBUG] Raw GraphQL response: {response}", file=sys.stderr)
+        
         # Check for GraphQL errors
         if "errors" in response:
             error_messages = [error.get("message", "Unknown error") for error in response["errors"]]
