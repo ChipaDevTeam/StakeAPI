@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=45", "wheel", "setuptools_scm"]
+requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "stakeapi"
-dynamic = ["version"]
+version = "0.1.0"
 description = "Unofficial Python API wrapper for stake.com"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -56,9 +56,6 @@ Homepage = "https://github.com/chipadevteam/StakeAPI"
 Documentation = "https://chipadevteam.github.io/StakeAPI/"
 Repository = "https://github.com/chipadevteam/StakeAPI"
 "Bug Tracker" = "https://github.com/chipadevteam/StakeAPI/issues"
-
-[tool.setuptools_scm]
-write_to = "stakeapi/_version.py"
 
 [tool.setuptools.packages.find]
 include = ["stakeapi*"]
