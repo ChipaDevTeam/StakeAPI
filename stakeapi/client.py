@@ -188,10 +188,6 @@ class StakeAPI:
             
         response = await self._request("POST", "/_api/graphql", data=payload)
         
-        # Debug: print raw response
-        import sys
-        print(f"[DEBUG] Raw GraphQL response: {response}", file=sys.stderr)
-        
         # Check for GraphQL errors
         if "errors" in response:
             error_messages = [error.get("message", "Unknown error") for error in response["errors"]]
@@ -302,20 +298,14 @@ class StakeAPI:
         }
         
         if "user" in data and data["user"] and "balances" in data["user"]:
-            balances = data["user"]["balances"]
-            
-            # Process available balances
-            if "available" in balances:
-                for balance in balances["available"]:
-                    currency = balance.get("currency", "").lower()
-                    amount = float(balance.get("amount", 0))
+            for entry in data["user"]["balances"]:
+                if "available" in entry:
+                    currency = entry["available"].get("currency", "").lower()
+                    amount = float(entry["available"].get("amount", 0))
                     result["available"][currency] = amount
-            
-            # Process vault balances
-            if "vault" in balances:
-                for balance in balances["vault"]:
-                    currency = balance.get("currency", "").lower()
-                    amount = float(balance.get("amount", 0))
+                if "vault" in entry:
+                    currency = entry["vault"].get("currency", "").lower()
+                    amount = float(entry["vault"].get("amount", 0))
                     result["vault"][currency] = amount
         
         return result

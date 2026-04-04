@@ -15,8 +15,7 @@ async def main():
         
         # 1. Get your balance
         balance = await client.get_user_balance()
-        print("Raw response:", balance)
-        print("\n💰 Your Balance:")
+        print("💰 Your Balance:")
         if balance["available"]:
             for currency, amount in balance["available"].items():
                 if amount > 0:
