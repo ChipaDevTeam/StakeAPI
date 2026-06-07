@@ -230,6 +230,7 @@ async def live_balance_tracker():
 
 {% include affiliate-banner.html %}
 {% include discord-cta.html %}
+{% include chipaeditor-cta.html %}
 
 ---
 

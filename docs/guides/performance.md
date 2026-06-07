@@ -206,6 +206,7 @@ Typical latencies for StakeAPI operations:
 
 {% include affiliate-banner.html %}
 {% include discord-cta.html %}
+{% include chipaeditor-cta.html %}
 
 ---
 

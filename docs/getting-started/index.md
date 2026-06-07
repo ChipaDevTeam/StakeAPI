@@ -33,3 +33,4 @@ Each step is covered in detail in the pages below. Most developers are up and ru
 
 {% include affiliate-cta.html %}
 {% include discord-cta.html %}
+{% include chipaeditor-cta.html %}

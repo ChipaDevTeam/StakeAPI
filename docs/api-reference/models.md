@@ -270,6 +270,7 @@ game = Game(id=123, name=456)  # id and name must be strings
 
 {% include affiliate-banner.html %}
 {% include discord-cta.html %}
+{% include chipaeditor-cta.html %}
 
 ---
 

@@ -161,6 +161,7 @@ Be respectful and constructive. We're all here to build something great together
 
 {% include affiliate-banner.html %}
 {% include discord-cta.html %}
+{% include chipaeditor-cta.html %}
 
 ---
 

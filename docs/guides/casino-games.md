@@ -209,6 +209,7 @@ class Game(BaseModel):
 
 {% include affiliate-banner.html %}
 {% include discord-cta.html %}
+{% include chipaeditor-cta.html %}
 
 ## Real-World Example: Casino Dashboard
 

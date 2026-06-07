@@ -199,6 +199,7 @@ logger.info(f"Using token: {token}")
 
 {% include affiliate-banner.html %}
 {% include discord-cta.html %}
+{% include chipaeditor-cta.html %}
 
 ---
 

@@ -138,3 +138,4 @@ Now that StakeAPI is installed, you need a Stake.com account and access token:
 
 {% include affiliate-banner.html %}
 {% include discord-cta.html %}
+{% include chipaeditor-cta.html %}

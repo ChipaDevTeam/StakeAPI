@@ -176,6 +176,7 @@ For more issues, see the [Troubleshooting Guide]({% link resources/troubleshooti
 
 {% include affiliate-banner.html %}
 {% include discord-cta.html %}
+{% include chipaeditor-cta.html %}
 
 ---
 

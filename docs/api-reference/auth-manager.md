@@ -185,6 +185,7 @@ session = AuthManager.extract_session_from_curl("""
 
 {% include affiliate-banner.html %}
 {% include discord-cta.html %}
+{% include chipaeditor-cta.html %}
 
 ---
 

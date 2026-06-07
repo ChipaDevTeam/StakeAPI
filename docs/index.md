@@ -119,6 +119,7 @@ StakeAPI supports Python 3.8 and above:
 
 {% include affiliate-banner.html %}
 {% include discord-cta.html %}
+{% include chipaeditor-cta.html %}
 
 ---
 

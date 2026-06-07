@@ -120,3 +120,4 @@ The first public release of StakeAPI — the most comprehensive Python wrapper f
 
 {% include affiliate-banner.html %}
 {% include discord-cta.html %}
+{% include chipaeditor-cta.html %}

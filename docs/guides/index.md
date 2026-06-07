@@ -34,3 +34,4 @@ Each guide includes working code examples you can copy and modify. All examples 
 
 {% include affiliate-cta.html %}
 {% include discord-cta.html %}
+{% include chipaeditor-cta.html %}

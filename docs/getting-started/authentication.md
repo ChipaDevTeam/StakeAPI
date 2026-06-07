@@ -224,6 +224,7 @@ if auth.is_token_expired():
 
 {% include affiliate-banner.html %}
 {% include discord-cta.html %}
+{% include chipaeditor-cta.html %}
 
 ## Next Steps
 

@@ -235,6 +235,7 @@ asyncio.run(daily_pnl())
 
 {% include affiliate-banner.html %}
 {% include discord-cta.html %}
+{% include chipaeditor-cta.html %}
 
 ---
 

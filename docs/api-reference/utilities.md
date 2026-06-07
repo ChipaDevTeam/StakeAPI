@@ -183,6 +183,7 @@ sanitize_game_name("")                        # ""
 
 {% include affiliate-banner.html %}
 {% include discord-cta.html %}
+{% include chipaeditor-cta.html %}
 
 ---
 

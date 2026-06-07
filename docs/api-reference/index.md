@@ -29,3 +29,4 @@ All API methods require a valid [Stake.com account](https://stake.com/?c=WY7953w
 
 {% include affiliate-cta.html %}
 {% include discord-cta.html %}
+{% include chipaeditor-cta.html %}

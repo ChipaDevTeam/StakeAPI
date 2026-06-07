@@ -27,3 +27,4 @@ Examples, FAQ, troubleshooting, and everything else you need.
 
 {% include affiliate-cta.html %}
 {% include discord-cta.html %}
+{% include chipaeditor-cta.html %}

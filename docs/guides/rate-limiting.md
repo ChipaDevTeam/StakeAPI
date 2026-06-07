@@ -136,6 +136,7 @@ async def batch_fetch(client, game_ids: list, concurrency: int = 5):
 
 {% include affiliate-banner.html %}
 {% include discord-cta.html %}
+{% include chipaeditor-cta.html %}
 
 ---
 
