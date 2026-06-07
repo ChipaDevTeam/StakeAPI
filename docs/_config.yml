@@ -12,6 +12,8 @@ permalink: pretty
 aux_links:
   "Get Started on Stake.com":
     - "https://stake.com/?c=WY7953wQ"
+  "ChipaEditor":
+    - "https://chipaeditor.com"
   "Discord":
     - "https://discord.gg/PHHfh6UyCb"
   "GitHub":
@@ -47,7 +49,7 @@ callouts:
     title: Warning
     color: red
 
-footer_content: '<a href="https://stake.com/?c=WY7953wQ" target="_blank" rel="noopener">Sign up on Stake.com</a> and start building with StakeAPI today. | <a href="https://discord.gg/PHHfh6UyCb" target="_blank" rel="noopener">Join our Discord</a> &copy; 2024-2026 StakeAPI Contributors.'
+footer_content: '<a href="https://stake.com/?c=WY7953wQ" target="_blank" rel="noopener">Sign up on Stake.com</a> and start building with StakeAPI today. | <a href="https://discord.gg/PHHfh6UyCb" target="_blank" rel="noopener">Join our Discord</a> | <a href="https://chipaeditor.com" target="_blank" rel="noopener">ChipaEditor</a> &copy; 2024-2026 StakeAPI Contributors.'
 
 back_to_top: true
 back_to_top_text: "Back to top"
