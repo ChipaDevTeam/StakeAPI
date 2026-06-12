@@ -262,7 +262,7 @@ balance = asyncio.run(main())
 
 ## Still Stuck?
 
-1. Check the [FAQ]({% link resources/faq.md %})
+1. Check the [FAQ]({% link docs/resources/faq.md %})
 2. Search [GitHub Issues](https://github.com/chipadevteam/StakeAPI/issues)
 3. Open a new issue with:
    - StakeAPI version

@@ -46,7 +46,7 @@ Python 3.8 and above (3.8, 3.9, 3.10, 3.11, 3.12).
 5. Find a request to `/_api/graphql`
 6. Copy the `x-access-token` header value
 
-See the [Authentication Guide]({% link getting-started/authentication.md %}) for detailed instructions.
+See the [Authentication Guide]({% link docs/getting-started/authentication.md %}) for detailed instructions.
 
 ### Do I need a Stake.com account?
 
@@ -58,7 +58,7 @@ Yes. You need a [Stake.com account](https://stake.com/?c=WY7953wQ) to get an acc
 pip install stakeapi
 ```
 
-See the [Installation Guide]({% link getting-started/installation.md %}) for more options.
+See the [Installation Guide]({% link docs/getting-started/installation.md %}) for more options.
 
 ---
 
@@ -104,7 +104,7 @@ client2 = StakeAPI(access_token="token_account_2")
 
 ### Is there a rate limit?
 
-Yes. Stake.com enforces rate limits. The default is 10 requests/second. See the [Rate Limiting Guide]({% link guides/rate-limiting.md %}).
+Yes. Stake.com enforces rate limits. The default is 10 requests/second. See the [Rate Limiting Guide]({% link docs/guides/rate-limiting.md %}).
 
 ### Can I place bets with the API?
 
@@ -116,7 +116,7 @@ The current version does not support deposits or withdrawals for security reason
 
 ### Does StakeAPI support WebSockets?
 
-Yes! See the [WebSocket Guide]({% link guides/websockets.md %}) for real-time data streaming.
+Yes! See the [WebSocket Guide]({% link docs/guides/websockets.md %}) for real-time data streaming.
 
 ---
 
@@ -150,7 +150,7 @@ StakeAPI pins known endpoints. If Stake.com changes their API, you may need to u
 
 ### Is my data safe?
 
-StakeAPI communicates exclusively over HTTPS. Your tokens are never stored or transmitted to third parties. See the [Security Guide]({% link guides/security.md %}).
+StakeAPI communicates exclusively over HTTPS. Your tokens are never stored or transmitted to third parties. See the [Security Guide]({% link docs/guides/security.md %}).
 
 ---
 
@@ -172,7 +172,7 @@ Make sure your account has the relevant data (bets, balance, etc.). Some endpoin
 
 Make sure you're using `async with` or calling `await client.close()`. Check your timeout settings.
 
-For more issues, see the [Troubleshooting Guide]({% link resources/troubleshooting.md %}).
+For more issues, see the [Troubleshooting Guide]({% link docs/resources/troubleshooting.md %}).
 
 {% include affiliate-banner.html %}
 {% include discord-cta.html %}

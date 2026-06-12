@@ -172,12 +172,12 @@ Now that you've made your first API call, explore the full power of StakeAPI:
 
 | Guide | Description |
 |:------|:------------|
-| [Casino Games]({% link guides/casino-games.md %}) | Browse and analyze casino games |
-| [Sports Betting]({% link guides/sports-betting.md %}) | Access sports events and odds |
-| [User Account]({% link guides/user-account.md %}) | Manage your profile and balance |
-| [Betting API]({% link guides/betting.md %}) | Place bets and track history |
-| [Advanced Usage]({% link guides/advanced-usage.md %}) | Build analytics and automation tools |
-| [API Reference]({% link api-reference/client.md %}) | Complete method documentation |
+| [Casino Games]({% link docs/guides/casino-games.md %}) | Browse and analyze casino games |
+| [Sports Betting]({% link docs/guides/sports-betting.md %}) | Access sports events and odds |
+| [User Account]({% link docs/guides/user-account.md %}) | Manage your profile and balance |
+| [Betting API]({% link docs/guides/betting.md %}) | Place bets and track history |
+| [Advanced Usage]({% link docs/guides/advanced-usage.md %}) | Build analytics and automation tools |
+| [API Reference]({% link docs/api-reference/client.md %}) | Complete method documentation |
 
 ---
 

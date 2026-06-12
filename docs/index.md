@@ -12,7 +12,7 @@ permalink: /
 The most powerful unofficial Python wrapper for the Stake.com API. Build bots, analytics dashboards, and automation tools with ease.
 {: .fs-6 .fw-300 }
 
-[Get Started]({% link getting-started/installation.md %}){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
+[Get Started]({% link docs/getting-started/installation.md %}){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
 [View on GitHub](https://github.com/chipadevteam/StakeAPI){: .btn .fs-5 .mb-4 .mb-md-0 }
 [Sign Up on Stake.com](https://stake.com/?c=WY7953wQ){: .btn .btn-green .fs-5 .mb-4 .mb-md-0 }
 
@@ -113,8 +113,8 @@ StakeAPI supports Python 3.8 and above:
 ## Community & Support
 
 - [GitHub Issues](https://github.com/chipadevteam/StakeAPI/issues) — Report bugs and request features
-- [Contributing Guide]({% link resources/contributing.md %}) — Learn how to contribute
-- [Changelog]({% link resources/changelog.md %}) — See what's new
+- [Contributing Guide]({% link docs/resources/contributing.md %}) — Learn how to contribute
+- [Changelog]({% link docs/resources/changelog.md %}) — See what's new
 - [Discord Server](https://discord.gg/PHHfh6UyCb) — Join the community, get help, and share your projects
 
 {% include affiliate-banner.html %}
@@ -131,4 +131,4 @@ The fastest way to get started is to [create a Stake.com account](https://stake.
 pip install stakeapi
 ```
 
-Then head to the [Installation Guide]({% link getting-started/installation.md %}) for detailed setup instructions.
+Then head to the [Installation Guide]({% link docs/getting-started/installation.md %}) for detailed setup instructions.

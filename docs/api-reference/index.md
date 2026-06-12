@@ -18,12 +18,12 @@ Complete technical reference for every class, method, and model in StakeAPI.
 
 | Module | Description |
 |:-------|:------------|
-| [StakeAPI Client]({% link api-reference/client.md %}) | Main client class — all API methods |
-| [AuthManager]({% link api-reference/auth-manager.md %}) | Authentication and token management |
-| [Data Models]({% link api-reference/models.md %}) | Pydantic models for typed responses |
-| [Endpoints]({% link api-reference/endpoints.md %}) | API endpoint constants and GraphQL queries |
-| [Exceptions]({% link api-reference/exceptions.md %}) | Error types and exception hierarchy |
-| [Utilities]({% link api-reference/utilities.md %}) | Helper functions and validators |
+| [StakeAPI Client]({% link docs/api-reference/client.md %}) | Main client class — all API methods |
+| [AuthManager]({% link docs/api-reference/auth-manager.md %}) | Authentication and token management |
+| [Data Models]({% link docs/api-reference/models.md %}) | Pydantic models for typed responses |
+| [Endpoints]({% link docs/api-reference/endpoints.md %}) | API endpoint constants and GraphQL queries |
+| [Exceptions]({% link docs/api-reference/exceptions.md %}) | Error types and exception hierarchy |
+| [Utilities]({% link docs/api-reference/utilities.md %}) | Helper functions and validators |
 
 All API methods require a valid [Stake.com account](https://stake.com/?c=WY7953wQ) and access token.
 
