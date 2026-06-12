@@ -25,6 +25,9 @@ heading_anchors: true
 
 nav_sort: case_insensitive
 
+# Collapse sidebar sections by default; expand the current section automatically
+nav_fold: true
+
 search_enabled: true
 search:
   heading_level: 2
