@@ -1,6 +1,6 @@
 ---
 layout: default
-title: Endpoints
+title: Endpoints & GraphQL
 parent: API Reference
 nav_order: 4
 ---
@@ -8,16 +8,21 @@ nav_order: 4
 # Endpoints & GraphQL Queries
 {: .fs-9 }
 
-Complete reference of API endpoints, routes, and built-in GraphQL queries.
+All URL constants and pre-built GraphQL queries used by StakeAPI.
 {: .fs-6 .fw-300 }
 
 ---
 
 {% include affiliate-cta.html %}
 
-## Endpoints Class
+## Overview
 
-All API endpoint constants are defined in the `Endpoints` class.
+StakeAPI provides two classes for working with Stake.com's backend:
+
+- **`Endpoints`** — String constants for every REST-style URL path.
+- **`GraphQLQueries`** — Ready-to-use GraphQL query strings for the primary operations.
+
+The `StakeAPI` client uses these internally, but you can import them directly for custom requests via `_request()` or `_graphql_request()`.
 
 **Import:**
 
@@ -25,80 +30,113 @@ All API endpoint constants are defined in the `Endpoints` class.
 from stakeapi.endpoints import Endpoints, GraphQLQueries
 ```
 
-### Core
+---
+
+## Class: `Endpoints`
+
+A namespace of URL path constants. All paths are relative to `base_url` (default `https://stake.com`).
+
+### GraphQL Endpoint
 
 | Constant | Value | Description |
 |:---------|:------|:------------|
-| `GRAPHQL` | `/_api/graphql` | Main GraphQL endpoint |
-| `API_BASE` | `/api/v1` | REST API base path |
+| `Endpoints.GRAPHQL` | `/_api/graphql` | Primary GraphQL endpoint — **all modern API calls use this** |
+
+### Base
+
+| Constant | Value |
+|:---------|:------|
+| `Endpoints.API_BASE` | `/api/v1` |
 
 ### Authentication
 
 | Constant | Path | Description |
 |:---------|:-----|:------------|
-| `AUTH_LOGIN` | `/api/v1/auth/login` | Login endpoint |
-| `AUTH_LOGOUT` | `/api/v1/auth/logout` | Logout endpoint |
-| `AUTH_REFRESH` | `/api/v1/auth/refresh` | Token refresh |
+| `Endpoints.AUTH_LOGIN` | `/api/v1/auth/login` | Log in with credentials |
+| `Endpoints.AUTH_LOGOUT` | `/api/v1/auth/logout` | Invalidate session |
+| `Endpoints.AUTH_REFRESH` | `/api/v1/auth/refresh` | Refresh access token |
 
 ### User
 
 | Constant | Path | Description |
 |:---------|:-----|:------------|
-| `USER_PROFILE` | `/api/v1/user/profile` | User profile |
-| `USER_BALANCE` | `/api/v1/user/balance` | Account balance |
-| `USER_STATISTICS` | `/api/v1/user/statistics` | Betting statistics |
-| `USER_TRANSACTIONS` | `/api/v1/user/transactions` | Transaction history |
+| `Endpoints.USER_PROFILE` | `/api/v1/user/profile` | Fetch user profile |
+| `Endpoints.USER_BALANCE` | `/api/v1/user/balance` | Fetch wallet balance |
+| `Endpoints.USER_STATISTICS` | `/api/v1/user/statistics` | Fetch betting statistics |
+| `Endpoints.USER_TRANSACTIONS` | `/api/v1/user/transactions` | Fetch transaction history |
 
 ### Casino
 
 | Constant | Path | Description |
 |:---------|:-----|:------------|
-| `CASINO_GAMES` | `/api/v1/casino/games` | List all games |
-| `CASINO_GAME_DETAILS` | `/api/v1/casino/games/{game_id}` | Single game details |
-| `CASINO_PROVIDERS` | `/api/v1/casino/providers` | Game providers |
-| `CASINO_CATEGORIES` | `/api/v1/casino/categories` | Game categories |
+| `Endpoints.CASINO_GAMES` | `/api/v1/casino/games` | List all casino games |
+| `Endpoints.CASINO_GAME_DETAILS` | `/api/v1/casino/games/{game_id}` | Details for a single game |
+| `Endpoints.CASINO_PROVIDERS` | `/api/v1/casino/providers` | List game providers |
+| `Endpoints.CASINO_CATEGORIES` | `/api/v1/casino/categories` | List game categories |
 
 ### Sports
 
 | Constant | Path | Description |
 |:---------|:-----|:------------|
-| `SPORTS_EVENTS` | `/api/v1/sports/events` | Sports events |
-| `SPORTS_EVENT_DETAILS` | `/api/v1/sports/events/{event_id}` | Event details |
-| `SPORTS_LEAGUES` | `/api/v1/sports/leagues` | Available leagues |
-| `SPORTS_ODDS` | `/api/v1/sports/odds` | Odds data |
+| `Endpoints.SPORTS_EVENTS` | `/api/v1/sports/events` | List sports events |
+| `Endpoints.SPORTS_EVENT_DETAILS` | `/api/v1/sports/events/{event_id}` | Single event details |
+| `Endpoints.SPORTS_LEAGUES` | `/api/v1/sports/leagues` | List available leagues |
+| `Endpoints.SPORTS_ODDS` | `/api/v1/sports/odds` | Current odds |
 
 ### Betting
 
 | Constant | Path | Description |
 |:---------|:-----|:------------|
-| `PLACE_BET` | `/api/v1/bets/place` | Place a bet |
-| `BET_HISTORY` | `/api/v1/bets/history` | Bet history |
-| `BET_DETAILS` | `/api/v1/bets/{bet_id}` | Bet details |
-| `CANCEL_BET` | `/api/v1/bets/{bet_id}/cancel` | Cancel a bet |
+| `Endpoints.PLACE_BET` | `/api/v1/bets/place` | Submit a bet |
+| `Endpoints.BET_HISTORY` | `/api/v1/bets/history` | Fetch bet history |
+| `Endpoints.BET_DETAILS` | `/api/v1/bets/{bet_id}` | Single bet details |
+| `Endpoints.CANCEL_BET` | `/api/v1/bets/{bet_id}/cancel` | Cancel a pending bet |
 
 ### Live
 
 | Constant | Path | Description |
 |:---------|:-----|:------------|
-| `LIVE_GAMES` | `/api/v1/live/games` | Live casino games |
-| `LIVE_EVENTS` | `/api/v1/live/events` | Live sports events |
+| `Endpoints.LIVE_GAMES` | `/api/v1/live/games` | Active live casino games |
+| `Endpoints.LIVE_EVENTS` | `/api/v1/live/events` | In-play sports events |
 
 ### Promotions
 
 | Constant | Path | Description |
 |:---------|:-----|:------------|
-| `PROMOTIONS` | `/api/v1/promotions` | Active promotions |
-| `PROMOTION_DETAILS` | `/api/v1/promotions/{promo_id}` | Promotion details |
+| `Endpoints.PROMOTIONS` | `/api/v1/promotions` | List all promotions |
+| `Endpoints.PROMOTION_DETAILS` | `/api/v1/promotions/{promo_id}` | Single promotion details |
+
+### Usage Example
+
+```python
+from stakeapi import StakeAPI
+from stakeapi.endpoints import Endpoints
+
+async with StakeAPI(access_token="...", cf_clearance="...") as client:
+    # Use a constant directly in a raw request
+    data = await client._request("GET", Endpoints.USER_PROFILE)
+    print(data)
+
+    # Format path templates
+    endpoint = Endpoints.CASINO_GAME_DETAILS.format(game_id="plinko")
+    # → "/api/v1/casino/games/plinko"
+    game_data = await client._request("GET", endpoint)
+```
+
+{: .note }
+> Stake.com has largely migrated to GraphQL. The REST endpoints above exist as constants for convenience and forward-compatibility, but the `/_api/graphql` endpoint is the one actively used in production today.
 
 ---
 
-## GraphQL Queries
+## Class: `GraphQLQueries`
 
-Pre-built GraphQL queries for common operations.
+Pre-built GraphQL query strings. Each is a multi-line string you can pass directly to `_graphql_request()`. You can also use them as starting points for writing custom queries.
+
+---
 
 ### `GraphQLQueries.USER_BALANCES`
 
-Fetches user balance with available and vault amounts for all currencies.
+Fetches the authenticated user's wallet balances — both the spendable (`available`) amount and the locked (`vault`) amount — across all currencies.
 
 ```graphql
 query UserBalances {
@@ -108,19 +146,41 @@ query UserBalances {
       available {
         amount
         currency
+        __typename
       }
       vault {
         amount
         currency
+        __typename
       }
+      __typename
     }
+    __typename
   }
 }
 ```
 
+**Usage:**
+
+```python
+from stakeapi.endpoints import GraphQLQueries
+
+async with StakeAPI(access_token="...", cf_clearance="...") as client:
+    data = await client._graphql_request(
+        query=GraphQLQueries.USER_BALANCES,
+        operation_name="UserBalances",
+    )
+    for entry in data["user"]["balances"]:
+        currency = entry["available"]["currency"]
+        amount   = entry["available"]["amount"]
+        print(f"  {currency}: {amount}")
+```
+
+---
+
 ### `GraphQLQueries.USER_PROFILE`
 
-Fetches user profile information including VIP level.
+Fetches the authenticated user's profile including ID, name, email, verification status, country, and level.
 
 ```graphql
 query UserProfile {
@@ -131,62 +191,246 @@ query UserProfile {
     isEmailVerified
     country
     level
-    statistics { ... }
+    statistics {
+      __typename
+    }
+    __typename
   }
 }
 ```
 
-### `GraphQLQueries.CASINO_GAMES`
+**Usage:**
 
-Paginated query for casino games with category filtering.
-
-**Variables:**
-
-| Variable | Type | Description |
-|:---------|:-----|:------------|
-| `first` | `Int` | Number of results per page |
-| `after` | `String` | Cursor for pagination |
-| `categorySlug` | `String` | Category filter |
-
-### `GraphQLQueries.SPORTS_EVENTS`
-
-Fetch sports events with markets and odds.
-
-**Variables:**
-
-| Variable | Type | Description |
-|:---------|:-----|:------------|
-| `first` | `Int` | Number of results |
-| `sportSlug` | `String` | Sport filter |
-
-### `GraphQLQueries.BET_HISTORY`
-
-Paginated bet history with game details and outcomes.
-
-**Variables:**
-
-| Variable | Type | Description |
-|:---------|:-----|:------------|
-| `first` | `Int` | Number of results per page |
-| `after` | `String` | Cursor for pagination |
+```python
+data = await client._graphql_request(
+    query=GraphQLQueries.USER_PROFILE,
+    operation_name="UserProfile",
+)
+print(data["user"]["name"])
+print(data["user"]["isEmailVerified"])
+```
 
 ---
 
-## Using Endpoints
+### `GraphQLQueries.CASINO_GAMES`
 
-### Dynamic Path Parameters
+Paginated list of casino games with provider and category info.
 
-Some endpoints have path parameters. Use Python's string formatting:
+```graphql
+query CasinoGames($first: Int, $after: String, $categorySlug: String) {
+  casinoGames(first: $first, after: $after, categorySlug: $categorySlug) {
+    edges {
+      node {
+        id
+        name
+        slug
+        provider { name __typename }
+        thumb
+        category { name slug __typename }
+        __typename
+      }
+      __typename
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+      __typename
+    }
+    __typename
+  }
+}
+```
+
+**Variables:**
+
+| Variable | Type | Description |
+|:---------|:-----|:------------|
+| `first` | `Int` | Number of games per page (e.g. `50`) |
+| `after` | `String` | Cursor for pagination (from `pageInfo.endCursor`) |
+| `categorySlug` | `String` | Filter by category, e.g. `"slots"`, `"originals"` |
+
+**Usage:**
 
 ```python
-# Game details
-endpoint = Endpoints.CASINO_GAME_DETAILS.format(game_id="sweet-bonanza")
-# Result: /api/v1/casino/games/sweet-bonanza
+# First page of slots
+data = await client._graphql_request(
+    query=GraphQLQueries.CASINO_GAMES,
+    variables={"first": 20, "categorySlug": "slots"},
+    operation_name="CasinoGames",
+)
 
-# Bet details
-endpoint = Endpoints.BET_DETAILS.format(bet_id="bet_123")
-# Result: /api/v1/bets/bet_123
+games = data["casinoGames"]["edges"]
+for edge in games:
+    g = edge["node"]
+    print(f"{g['name']} by {g['provider']['name']}")
+
+# Paginate to next page
+page_info = data["casinoGames"]["pageInfo"]
+if page_info["hasNextPage"]:
+    next_data = await client._graphql_request(
+        query=GraphQLQueries.CASINO_GAMES,
+        variables={"first": 20, "after": page_info["endCursor"]},
+        operation_name="CasinoGames",
+    )
 ```
+
+---
+
+### `GraphQLQueries.SPORTS_EVENTS`
+
+Paginated sports events with competitors, league, and market odds.
+
+```graphql
+query SportsEvents($first: Int, $sportSlug: String) {
+  sportsEvents(first: $first, sportSlug: $sportSlug) {
+    edges {
+      node {
+        id
+        name
+        startTime
+        sport     { name slug __typename }
+        league    { name slug __typename }
+        competitors { name __typename }
+        markets {
+          name
+          outcomes { name odds __typename }
+          __typename
+        }
+        __typename
+      }
+      __typename
+    }
+    __typename
+  }
+}
+```
+
+**Variables:**
+
+| Variable | Type | Description |
+|:---------|:-----|:------------|
+| `first` | `Int` | Number of events per page |
+| `sportSlug` | `String` | Filter by sport, e.g. `"football"`, `"basketball"` |
+
+**Usage:**
+
+```python
+data = await client._graphql_request(
+    query=GraphQLQueries.SPORTS_EVENTS,
+    variables={"first": 10, "sportSlug": "football"},
+    operation_name="SportsEvents",
+)
+
+for edge in data["sportsEvents"]["edges"]:
+    event = edge["node"]
+    teams = " vs ".join(c["name"] for c in event["competitors"])
+    print(f"{teams} — {event['startTime']}")
+    for market in event["markets"]:
+        outcomes = {o["name"]: o["odds"] for o in market["outcomes"]}
+        print(f"  {market['name']}: {outcomes}")
+```
+
+---
+
+### `GraphQLQueries.BET_HISTORY`
+
+Paginated bet history for the authenticated user with game info and payout details.
+
+```graphql
+query BetHistory($first: Int, $after: String) {
+  user {
+    bets(first: $first, after: $after) {
+      edges {
+        node {
+          id
+          amount
+          currency
+          multiplier
+          payout
+          createdAt
+          updatedAt
+          outcome
+          game { name slug __typename }
+          __typename
+        }
+        __typename
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+        __typename
+      }
+      __typename
+    }
+    __typename
+  }
+}
+```
+
+**Variables:**
+
+| Variable | Type | Description |
+|:---------|:-----|:------------|
+| `first` | `Int` | Number of bets per page |
+| `after` | `String` | Cursor for pagination |
+
+**Usage:**
+
+```python
+data = await client._graphql_request(
+    query=GraphQLQueries.BET_HISTORY,
+    variables={"first": 50},
+    operation_name="BetHistory",
+)
+
+bets = data["user"]["bets"]["edges"]
+for edge in bets:
+    b = edge["node"]
+    print(f"[{b['outcome']}] {b['amount']} {b['currency']} "
+          f"× {b['multiplier']} = {b['payout']} on {b['game']['name']}")
+```
+
+---
+
+## Writing Custom GraphQL Queries
+
+You are not limited to the pre-built queries. Use `_graphql_request()` to send any valid Stake.com GraphQL query.
+
+**Tips:**
+
+1. Open [Stake.com](https://stake.com/?c=WY7953wQ) in your browser and log in
+2. Open DevTools → **Network** tab → filter for `graphql`
+3. Click any request to see the exact query and variables Stake.com's frontend sends
+4. Copy the query and pass it to `_graphql_request()`
+
+```python
+# Custom query: fetch user's VIP level and rakeback rate
+custom_query = """
+query UserVIP {
+  user {
+    id
+    name
+    vipTier
+    rakeback {
+      percentage
+      __typename
+    }
+    __typename
+  }
+}
+"""
+
+data = await client._graphql_request(
+    query=custom_query,
+    operation_name="UserVIP",
+)
+print(data["user"]["vipTier"])
+```
+
+{: .warning }
+> Custom queries are not officially supported and may break if Stake.com changes its schema. Always test after Stake.com updates.
+
+---
 
 {% include affiliate-banner.html %}
 {% include discord-cta.html %}
@@ -194,5 +438,9 @@ endpoint = Endpoints.BET_DETAILS.format(bet_id="bet_123")
 
 ---
 
-{: .note }
-> Explore all available endpoints with a [Stake.com account](https://stake.com/?c=WY7953wQ). Use browser Developer Tools to discover additional queries.
+## See Also
+
+- [StakeAPI Client](client.md) — High-level methods that wrap these queries
+- [Data Models](models.md) — Objects returned after parsing query results
+- [GraphQL Guide](../guides/graphql-queries.md) — Deep-dive into raw GraphQL usage
+- [Authentication Guide](../getting-started/authentication.md) — How to authenticate requests
