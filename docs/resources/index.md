@@ -18,12 +18,12 @@ Examples, FAQ, troubleshooting, and everything else you need.
 
 | Resource | Description |
 |:---------|:------------|
-| [Examples]({% link resources/examples.md %}) | Ready-to-run code examples |
-| [FAQ]({% link resources/faq.md %}) | Frequently asked questions |
-| [Troubleshooting]({% link resources/troubleshooting.md %}) | Common issues and solutions |
-| [Changelog]({% link resources/changelog.md %}) | Version history and release notes |
-| [Contributing]({% link resources/contributing.md %}) | How to contribute to StakeAPI |
-| [Migration Guide]({% link resources/migration.md %}) | Upgrading between versions |
+| [Examples](examples.md) | Ready-to-run code examples |
+| [FAQ](faq.md) | Frequently asked questions |
+| [Troubleshooting](troubleshooting.md) | Common issues and solutions |
+| [Changelog](changelog.md) | Version history and release notes |
+| [Contributing](contributing.md) | How to contribute to StakeAPI |
+| [Migration Guide](migration.md) | Upgrading between versions |
 
 {% include affiliate-cta.html %}
 {% include discord-cta.html %}

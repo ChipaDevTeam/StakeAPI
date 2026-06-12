@@ -230,9 +230,9 @@ if auth.is_token_expired():
 
 Now that you're authenticated, make your first API call:
 
-- [Quick Start Guide]({% link getting-started/quickstart.md %}) — Your first API call in 30 seconds
-- [User Account API]({% link guides/user-account.md %}) — Get your profile and balance
-- [Casino Games API]({% link guides/casino-games.md %}) — Browse available games
+- [Quick Start Guide](quickstart.md) — Your first API call in 30 seconds
+- [User Account API](../guides/user-account.md) — Get your profile and balance
+- [Casino Games API](../guides/casino-games.md) — Browse available games
 
 ---
 
