@@ -8,7 +8,7 @@ nav_order: 3
 # Data Models
 {: .fs-9 }
 
-Type-safe Pydantic models for all Stake.com API responses.
+Typed Pydantic models for every object returned by the Stake.com API.
 {: .fs-6 .fw-300 }
 
 ---
@@ -17,7 +17,7 @@ Type-safe Pydantic models for all Stake.com API responses.
 
 ## Overview
 
-StakeAPI uses [Pydantic](https://docs.pydantic.dev/) models for automatic data validation, serialization, and type safety. All API responses are converted into these models.
+All models are built with [Pydantic v2](https://docs.pydantic.dev/) and provide full type safety. Every model exposes a `from_dict()` classmethod to construct instances from raw API response dictionaries. Fields use Python-native types — `Decimal` for monetary values, `datetime` for timestamps, `Optional[T]` where the API may omit a field.
 
 **Import:**
 
@@ -27,246 +27,356 @@ from stakeapi.models import User, Game, SportEvent, Bet, Transaction, Statistics
 
 ---
 
-## User
+## Class: `User`
 
 Represents a Stake.com user account.
 
-```python
-class User(BaseModel):
-    id: str
-    username: str
-    email: Optional[str] = None
-    verified: bool = False
-    created_at: datetime
-    country: Optional[str] = None
-    currency: str = "USD"
-```
+### Fields
 
 | Field | Type | Default | Description |
 |:------|:-----|:--------|:------------|
-| `id` | `str` | — | Unique user ID |
-| `username` | `str` | — | Display name |
-| `email` | `Optional[str]` | `None` | Email address |
-| `verified` | `bool` | `False` | Email verification status |
-| `created_at` | `datetime` | — | Account creation timestamp |
-| `country` | `Optional[str]` | `None` | User's country |
-| `currency` | `str` | `"USD"` | Preferred currency |
+| `id` | `str` | required | Unique user identifier |
+| `username` | `str` | required | Public display name |
+| `email` | `Optional[str]` | `None` | Email address (may be `None` if not exposed) |
+| `verified` | `bool` | `False` | Whether the account has completed verification |
+| `created_at` | `datetime` | required | Account creation timestamp (UTC) |
+| `country` | `Optional[str]` | `None` | ISO country code, e.g. `"US"`, `"GB"` |
+| `currency` | `str` | `"USD"` | Default display currency |
 
-### Factory Method
+### `from_dict(data)` *(classmethod)*
 
 ```python
-user = User.from_dict({"id": "123", "username": "player1", "created_at": "2024-01-01"})
+@classmethod
+def from_dict(cls, data: Dict[str, Any]) -> "User"
+```
+
+Construct a `User` from a raw dictionary (e.g. from a GraphQL response).
+
+### Example
+
+```python
+from stakeapi.models import User
+from datetime import datetime, timezone
+
+user = User(
+    id="u_12345",
+    username="highroller",
+    email="player@example.com",
+    verified=True,
+    created_at=datetime(2023, 6, 1, tzinfo=timezone.utc),
+    country="US",
+    currency="USD",
+)
+
+print(user.username)       # highroller
+print(user.verified)       # True
+print(user.created_at)     # 2023-06-01 00:00:00+00:00
+```
+
+### Usage with `StakeAPI`
+
+```python
+async with StakeAPI(access_token="...", cf_clearance="...") as client:
+    user = await client.get_user_profile()
+    print(f"{user.username} ({user.country})")
+    if not user.verified:
+        print("Account not verified — some features may be restricted.")
 ```
 
 ---
 
-## Game
+## Class: `Game`
 
-Represents a casino game on Stake.com.
+Represents a casino game available on Stake.com.
 
-```python
-class Game(BaseModel):
-    id: str
-    name: str
-    category: str
-    provider: str
-    description: Optional[str] = None
-    min_bet: Decimal = Decimal("0.01")
-    max_bet: Decimal = Decimal("1000.00")
-    rtp: Optional[float] = None
-    volatility: Optional[str] = None
-    features: List[str] = []
-    thumbnail_url: Optional[str] = None
-```
+### Fields
 
 | Field | Type | Default | Description |
 |:------|:-----|:--------|:------------|
-| `id` | `str` | — | Unique game identifier |
-| `name` | `str` | — | Game display name |
-| `category` | `str` | — | Game category (slots, table-games, etc.) |
-| `provider` | `str` | — | Software provider name |
-| `description` | `Optional[str]` | `None` | Game description |
-| `min_bet` | `Decimal` | `0.01` | Minimum bet amount |
+| `id` | `str` | required | Unique game identifier / slug |
+| `name` | `str` | required | Display name, e.g. `"Plinko"`, `"Mines"` |
+| `category` | `str` | required | Category slug, e.g. `"slots"`, `"live"`, `"originals"` |
+| `provider` | `str` | required | Provider name, e.g. `"Stake Originals"`, `"Pragmatic Play"` |
+| `description` | `Optional[str]` | `None` | Short game description |
+| `min_bet` | `Decimal` | `0.01` | Minimum bet amount in the account's currency |
 | `max_bet` | `Decimal` | `1000.00` | Maximum bet amount |
-| `rtp` | `Optional[float]` | `None` | Return to Player percentage |
-| `volatility` | `Optional[str]` | `None` | Volatility level (low/medium/high) |
-| `features` | `List[str]` | `[]` | Special features list |
-| `thumbnail_url` | `Optional[str]` | `None` | Thumbnail image URL |
+| `rtp` | `Optional[float]` | `None` | Return to Player percentage (0–100), e.g. `97.0` |
+| `volatility` | `Optional[str]` | `None` | Volatility rating: `"low"`, `"medium"`, `"high"` |
+| `features` | `List[str]` | `[]` | Special features, e.g. `["bonus_round", "free_spins"]` |
+| `thumbnail_url` | `Optional[str]` | `None` | URL of the game's thumbnail image |
 
-### Factory Method
+### `from_dict(data)` *(classmethod)*
 
 ```python
-game = Game.from_dict({
-    "id": "sweet-bonanza",
-    "name": "Sweet Bonanza",
-    "category": "slots",
-    "provider": "Pragmatic Play",
-    "rtp": 96.48,
-    "volatility": "high"
-})
+@classmethod
+def from_dict(cls, data: Dict[str, Any]) -> "Game"
+```
+
+### Example
+
+```python
+from stakeapi.models import Game
+from decimal import Decimal
+
+game = Game(
+    id="plinko",
+    name="Plinko",
+    category="originals",
+    provider="Stake Originals",
+    min_bet=Decimal("0.00000001"),
+    max_bet=Decimal("100.00"),
+    rtp=97.0,
+    volatility="high",
+    features=["multiplier"],
+)
+
+print(f"{game.name} — RTP: {game.rtp}%")
+print(f"Bets: {game.min_bet} to {game.max_bet}")
+```
+
+### Usage with `StakeAPI`
+
+```python
+async with StakeAPI(access_token="...", cf_clearance="...") as client:
+    games = await client.get_casino_games(category="originals")
+    with_rtp = [g for g in games if g.rtp is not None]
+    with_rtp.sort(key=lambda g: g.rtp, reverse=True)
+    print("Top 5 highest RTP Originals:")
+    for g in with_rtp[:5]:
+        print(f"  {g.name}: {g.rtp}%")
 ```
 
 ---
 
-## SportEvent
+## Class: `SportEvent`
 
-Represents a sports event/match.
+Represents a live or upcoming sports betting event.
 
-```python
-class SportEvent(BaseModel):
-    id: str
-    sport: str
-    league: str
-    home_team: str
-    away_team: str
-    start_time: datetime
-    status: str
-    odds: Dict[str, float] = {}
-    live: bool = False
-```
+### Fields
 
 | Field | Type | Default | Description |
 |:------|:-----|:--------|:------------|
-| `id` | `str` | — | Unique event ID |
-| `sport` | `str` | — | Sport type |
-| `league` | `str` | — | League/competition name |
-| `home_team` | `str` | — | Home team name |
-| `away_team` | `str` | — | Away team name |
-| `start_time` | `datetime` | — | Scheduled start time |
-| `status` | `str` | — | Event status |
-| `odds` | `Dict[str, float]` | `{}` | Market odds dictionary |
-| `live` | `bool` | `False` | Whether event is currently live |
+| `id` | `str` | required | Unique event identifier |
+| `sport` | `str` | required | Sport name, e.g. `"Football"`, `"Basketball"` |
+| `league` | `str` | required | League / competition name |
+| `home_team` | `str` | required | Home team or player name |
+| `away_team` | `str` | required | Away team or player name |
+| `start_time` | `datetime` | required | Scheduled start time (UTC) |
+| `status` | `str` | required | `"scheduled"`, `"live"`, `"finished"`, `"cancelled"` |
+| `odds` | `Dict[str, float]` | `{}` | Market odds, e.g. `{"home": 1.9, "draw": 3.4, "away": 4.1}` |
+| `live` | `bool` | `False` | `True` if the event is currently in-play |
 
-### Odds Format
+### `from_dict(data)` *(classmethod)*
 
 ```python
-event.odds = {
-    "home": 1.85,
-    "draw": 3.50,
-    "away": 4.20
-}
+@classmethod
+def from_dict(cls, data: Dict[str, Any]) -> "SportEvent"
+```
+
+### Example
+
+```python
+from stakeapi.models import SportEvent
+from datetime import datetime, timezone
+
+event = SportEvent(
+    id="evt_789",
+    sport="Football",
+    league="Premier League",
+    home_team="Arsenal",
+    away_team="Chelsea",
+    start_time=datetime(2025, 9, 15, 20, 0, tzinfo=timezone.utc),
+    status="scheduled",
+    odds={"home": 1.85, "draw": 3.50, "away": 4.20},
+    live=False,
+)
+
+print(f"{event.home_team} vs {event.away_team}")
+print(f"Kick-off: {event.start_time}")
+print(f"Home win odds: {event.odds.get('home', 'N/A')}")
+```
+
+### Usage with `StakeAPI`
+
+```python
+async with StakeAPI(access_token="...", cf_clearance="...") as client:
+    events = await client.get_sports_events(sport="football")
+    live_events = [e for e in events if e.live]
+    print(f"Live matches: {len(live_events)}")
+    for event in live_events:
+        best = max(event.odds.values()) if event.odds else "N/A"
+        print(f"  {event.home_team} vs {event.away_team} — best odds: {best}")
 ```
 
 ---
 
-## Bet
+## Class: `Bet`
 
-Represents a placed bet.
+Represents a placed bet on a casino game or sports event.
 
-```python
-class Bet(BaseModel):
-    id: str
-    user_id: str
-    game_id: Optional[str] = None
-    event_id: Optional[str] = None
-    bet_type: str
-    amount: Decimal
-    potential_payout: Decimal
-    odds: Optional[float] = None
-    status: str
-    placed_at: datetime
-    settled_at: Optional[datetime] = None
-```
+### Fields
 
 | Field | Type | Default | Description |
 |:------|:-----|:--------|:------------|
-| `id` | `str` | — | Unique bet ID |
-| `user_id` | `str` | — | User who placed the bet |
-| `game_id` | `Optional[str]` | `None` | Casino game ID (if casino bet) |
-| `event_id` | `Optional[str]` | `None` | Sports event ID (if sports bet) |
-| `bet_type` | `str` | — | Type of bet (single, multi, etc.) |
-| `amount` | `Decimal` | — | Wager amount |
-| `potential_payout` | `Decimal` | — | Potential winnings |
-| `odds` | `Optional[float]` | `None` | Bet odds |
-| `status` | `str` | — | `pending`, `won`, `lost`, `cancelled` |
-| `placed_at` | `datetime` | — | When the bet was placed |
-| `settled_at` | `Optional[datetime]` | `None` | When the bet was settled |
+| `id` | `str` | required | Unique bet identifier |
+| `user_id` | `str` | required | ID of the user who placed the bet |
+| `game_id` | `Optional[str]` | `None` | Casino game ID (set for casino bets) |
+| `event_id` | `Optional[str]` | `None` | Sport event ID (set for sports bets) |
+| `bet_type` | `str` | required | Type of bet: `"casino"`, `"sports"`, `"live"` |
+| `amount` | `Decimal` | required | Amount wagered |
+| `potential_payout` | `Decimal` | required | Potential return if the bet wins |
+| `odds` | `Optional[float]` | `None` | Decimal odds (sports bets) |
+| `status` | `str` | required | `"pending"`, `"won"`, `"lost"`, `"cancelled"` |
+| `placed_at` | `datetime` | required | When the bet was placed (UTC) |
+| `settled_at` | `Optional[datetime]` | `None` | When settled (`None` while pending) |
+
+### `from_dict(data)` *(classmethod)*
+
+```python
+@classmethod
+def from_dict(cls, data: Dict[str, Any]) -> "Bet"
+```
+
+### Example
+
+```python
+from stakeapi.models import Bet
+from decimal import Decimal
+from datetime import datetime, timezone
+
+bet = Bet(
+    id="bet_abc",
+    user_id="u_12345",
+    game_id="dice",
+    bet_type="casino",
+    amount=Decimal("0.00001"),
+    potential_payout=Decimal("0.00002"),
+    status="won",
+    placed_at=datetime(2025, 1, 10, 14, 30, tzinfo=timezone.utc),
+)
+
+profit = bet.potential_payout - bet.amount if bet.status == "won" else -bet.amount
+print(f"Bet: {bet.amount} → {bet.status} (P&L: {profit:+.8f})")
+```
+
+### Usage with `StakeAPI`
+
+```python
+async with StakeAPI(access_token="...", cf_clearance="...") as client:
+    bets = await client.get_bet_history(limit=50)
+    total_wagered = sum(b.amount for b in bets)
+    total_won     = sum(b.potential_payout for b in bets if b.status == "won")
+    print(f"Net: {total_won - total_wagered:+.8f}")
+```
 
 ---
 
-## Transaction
+## Class: `Transaction`
 
-Represents a financial transaction.
+Represents a financial transaction: deposit, withdrawal, bet deduction, or win credit.
 
-```python
-class Transaction(BaseModel):
-    id: str
-    user_id: str
-    type: str
-    amount: Decimal
-    currency: str
-    status: str
-    timestamp: datetime
-    description: Optional[str] = None
-```
-
-| Field | Type | Description |
-|:------|:-----|:------------|
-| `id` | `str` | Transaction ID |
-| `user_id` | `str` | User ID |
-| `type` | `str` | `deposit`, `withdrawal`, `bet`, `win` |
-| `amount` | `Decimal` | Transaction amount |
-| `currency` | `str` | Currency code |
-| `status` | `str` | Transaction status |
-| `timestamp` | `datetime` | When it occurred |
-| `description` | `Optional[str]` | Description |
-
----
-
-## Statistics
-
-Aggregated user statistics.
-
-```python
-class Statistics(BaseModel):
-    total_bets: int = 0
-    total_wagered: Decimal = Decimal("0")
-    total_won: Decimal = Decimal("0")
-    total_lost: Decimal = Decimal("0")
-    win_rate: float = 0.0
-    biggest_win: Decimal = Decimal("0")
-    favorite_game: Optional[str] = None
-```
+### Fields
 
 | Field | Type | Default | Description |
 |:------|:-----|:--------|:------------|
-| `total_bets` | `int` | `0` | Total number of bets |
-| `total_wagered` | `Decimal` | `0` | Total amount wagered |
-| `total_won` | `Decimal` | `0` | Total amount won |
-| `total_lost` | `Decimal` | `0` | Total amount lost |
-| `win_rate` | `float` | `0.0` | Win rate percentage |
-| `biggest_win` | `Decimal` | `0` | Largest single win |
-| `favorite_game` | `Optional[str]` | `None` | Most played game |
+| `id` | `str` | required | Unique transaction ID |
+| `user_id` | `str` | required | Owner user ID |
+| `type` | `str` | required | `"deposit"`, `"withdrawal"`, `"bet"`, `"win"` |
+| `amount` | `Decimal` | required | Transaction amount |
+| `currency` | `str` | required | Currency code, e.g. `"btc"`, `"eth"`, `"usdt"` |
+| `status` | `str` | required | `"pending"`, `"completed"`, `"failed"`, `"cancelled"` |
+| `timestamp` | `datetime` | required | When the transaction occurred (UTC) |
+| `description` | `Optional[str]` | `None` | Human-readable description |
+
+### `from_dict(data)` *(classmethod)*
+
+```python
+@classmethod
+def from_dict(cls, data: Dict[str, Any]) -> "Transaction"
+```
+
+### Example
+
+```python
+from stakeapi.models import Transaction
+from decimal import Decimal
+from datetime import datetime, timezone
+
+tx = Transaction(
+    id="tx_001",
+    user_id="u_12345",
+    type="deposit",
+    amount=Decimal("0.01"),
+    currency="btc",
+    status="completed",
+    timestamp=datetime(2025, 3, 1, 10, 0, tzinfo=timezone.utc),
+    description="Bitcoin deposit",
+)
+
+print(f"{tx.type.capitalize()}: {tx.amount} {tx.currency.upper()} ({tx.status})")
+```
 
 ---
 
-## Working with Models
+## Class: `Statistics`
 
-### Serialization
+Aggregated betting statistics for a user account.
 
-All models support Pydantic serialization:
+### Fields
 
-```python
-# To dictionary
-user_dict = user.model_dump()
+| Field | Type | Default | Description |
+|:------|:-----|:--------|:------------|
+| `total_bets` | `int` | `0` | Total number of bets placed |
+| `total_wagered` | `Decimal` | `0` | Sum of all bet amounts |
+| `total_won` | `Decimal` | `0` | Sum of all winning payouts |
+| `total_lost` | `Decimal` | `0` | Sum of all losing bet amounts |
+| `win_rate` | `float` | `0.0` | Win rate as a percentage (0–100) |
+| `biggest_win` | `Decimal` | `0` | Largest single winning payout |
+| `favorite_game` | `Optional[str]` | `None` | Game ID most frequently played |
 
-# To JSON string
-user_json = user.model_dump_json()
-
-# From dictionary
-user = User.from_dict(data)
-# or
-user = User(**data)
-```
-
-### Validation
-
-Pydantic automatically validates data types:
+### `from_dict(data)` *(classmethod)*
 
 ```python
-# This will raise a validation error
-game = Game(id=123, name=456)  # id and name must be strings
+@classmethod
+def from_dict(cls, data: Dict[str, Any]) -> "Statistics"
 ```
+
+### Example
+
+```python
+from stakeapi.models import Statistics
+from decimal import Decimal
+
+stats = Statistics(
+    total_bets=1500,
+    total_wagered=Decimal("0.15"),
+    total_won=Decimal("0.14"),
+    total_lost=Decimal("0.01"),
+    win_rate=48.7,
+    biggest_win=Decimal("0.005"),
+    favorite_game="dice",
+)
+
+print(f"Bets:      {stats.total_bets}")
+print(f"Win rate:  {stats.win_rate:.1f}%")
+print(f"Net P&L:   {stats.total_won - stats.total_wagered:+.8f}")
+print(f"Best win:  {stats.biggest_win:.8f}")
+```
+
+---
+
+## Model Summary
+
+| Model | Key Fields | Returned By |
+|:------|:-----------|:------------|
+| `User` | `id`, `username`, `verified`, `currency` | `get_user_profile()` |
+| `Game` | `id`, `name`, `category`, `rtp`, `min_bet` | `get_casino_games()`, `get_game_details()` |
+| `SportEvent` | `home_team`, `away_team`, `odds`, `live` | `get_sports_events()` |
+| `Bet` | `amount`, `status`, `potential_payout` | `place_bet()`, `get_bet_history()` |
+| `Transaction` | `type`, `amount`, `currency`, `status` | *(future endpoint)* |
+| `Statistics` | `total_bets`, `win_rate`, `biggest_win` | *(future endpoint)* |
+
+---
 
 {% include affiliate-banner.html %}
 {% include discord-cta.html %}
@@ -274,5 +384,9 @@ game = Game(id=123, name=456)  # id and name must be strings
 
 ---
 
-{: .note }
-> Working with real data is the best way to learn. [Sign up on Stake.com](https://stake.com/?c=WY7953wQ) and explore the full data model with live API responses.
+## See Also
+
+- [StakeAPI Client](client.md) — Methods that return these models
+- [Endpoints](endpoints.md) — GraphQL queries that power the data
+- [Utilities](utilities.md) — `safe_decimal()`, `format_currency()`, and helpers
+- [Exceptions](exceptions.md) — Error types you may encounter
