@@ -1,6 +1,7 @@
 # StakeAPI
 
 **Join our affiliate link**: https://stake.com/?c=WY7953wQ
+> **✨ Build with [Chipa Editor](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=StakeAPI&utm_term=support&utm_content=header) — the AI-powered strategy editor for Traders. Try it free!**
 
 An unofficial Python API wrapper for stake.com - the online gambling platform.
 
