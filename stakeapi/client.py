@@ -16,8 +16,19 @@ from .exceptions import (
     ValidationError,
 )
 from .models import User, Game, SportEvent, Bet
-from .endpoints import Endpoints
+from .endpoints import Endpoints, GraphQLQueries
 from .auth import AuthManager
+
+
+def _parse_datetime(value):
+    """Parse the RFC 1123 dates the API returns (e.g. 'Sat, 11 Jul 2026 07:41:10 GMT')."""
+    if not value:
+        return None
+    try:
+        from email.utils import parsedate_to_datetime
+        return parsedate_to_datetime(value)
+    except (TypeError, ValueError):
+        return value  # let pydantic try ISO formats
 
 
 class StakeAPI:

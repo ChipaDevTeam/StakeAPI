@@ -121,6 +121,8 @@ class GraphQLQueries:
     }
     """
     
+    # UNVERIFIED DRAFT — this query shape does not match the live schema;
+    # kept only as a starting point for future work
     SPORTS_EVENTS = """
     query SportsEvents($first: Int, $sportSlug: String) {
       sportsEvents(first: $first, sportSlug: $sportSlug) {
