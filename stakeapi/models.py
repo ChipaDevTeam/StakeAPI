@@ -69,9 +69,11 @@ class Bet(BaseModel):
     id: str
     user_id: str
     game_id: Optional[str] = None
+    game_name: Optional[str] = None
     event_id: Optional[str] = None
     bet_type: str
     amount: Decimal
+    currency: Optional[str] = None
     potential_payout: Decimal
     odds: Optional[float] = None
     status: str  # pending, won, lost, cancelled

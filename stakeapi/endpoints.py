@@ -121,6 +121,139 @@ class GraphQLQueries:
     }
     """
     
+    # Validated against the live API — public realtime feed of house bets
+    # across all bet types (captured from the site's own AllHouseBets query)
+    ALL_HOUSE_BETS = """
+    query AllHouseBets($limit: Int = 10) {
+      allHouseBets(limit: $limit) {
+        ...RealtimeHouseBet
+      }
+    }
+
+    fragment RealtimeHouseBet on Bet {
+      id
+      iid
+      game {
+        name
+        icon
+      }
+      bet {
+        __typename
+        ... on CasinoBet {
+          id
+          active
+          payoutMultiplier
+          amountMultiplier
+          amount
+          payout
+          updatedAt
+          currency
+          user {
+            id
+            name
+            preferenceHideBets
+          }
+        }
+        ... on EvolutionBet {
+          id
+          amount
+          currency
+          createdAt
+          payout
+          payoutMultiplier
+          user {
+            id
+            name
+            preferenceHideBets
+          }
+        }
+        ... on MultiplayerCrashBet {
+          id
+          payoutMultiplier
+          amount
+          payout
+          currency
+          updatedAt
+          user {
+            id
+            name
+            preferenceHideBets
+          }
+        }
+        ... on MultiplayerSlideBet {
+          id
+          payoutMultiplier
+          amount
+          payout
+          currency
+          updatedAt
+          createdAt
+          user {
+            id
+            name
+            preferenceHideBets
+          }
+        }
+        ... on SoftswissBet {
+          id
+          amount
+          currency
+          updatedAt
+          payout
+          payoutMultiplier
+          user {
+            id
+            name
+            preferenceHideBets
+          }
+        }
+        ... on ThirdPartyBet {
+          id
+          amount
+          currency
+          updatedAt
+          createdAt
+          payout
+          payoutMultiplier
+          user {
+            id
+            name
+            preferenceHideBets
+          }
+        }
+        ... on ZooBet {
+          id
+          amount
+          currency
+          updatedAt
+          createdAt
+          payout
+          payoutMultiplier
+          user {
+            id
+            name
+            preferenceHideBets
+          }
+        }
+      }
+    }
+    """
+
+    # Validated against the live API — currency exchange rates (vs USD)
+    # and fiat currency configuration
+    CURRENCY_CONFIGURATION = """
+    query CurrencyConfiguration($isAcp: Boolean!) {
+      currencyConfiguration(isAcp: $isAcp) {
+        baseRates {
+          currency
+          baseRate
+        }
+        launchedFiatCurrencies
+        displayFiatCurrencies
+      }
+    }
+    """
+
     # UNVERIFIED DRAFT — this query shape does not match the live schema;
     # kept only as a starting point for future work
     SPORTS_EVENTS = """
@@ -164,13 +297,19 @@ class GraphQLQueries:
     """
     
     # Validated against the live API — bet history is user.houseBetList;
-    # 'game' on CasinoBet is a plain enum value (e.g. "dice"), not an object
+    # 'game' on the outer Bet is an object, while CasinoBet.game is an enum
     BET_HISTORY = """
     query BetHistory($limit: Int!, $offset: Int!) {
       user {
         houseBetList(limit: $limit, offset: $offset) {
           id
           iid
+          game {
+            name
+            icon
+            slug
+            __typename
+          }
           bet {
             __typename
             ... on CasinoBet {
