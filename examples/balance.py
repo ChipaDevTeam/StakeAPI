@@ -22,12 +22,20 @@ async def main():
     # e.g. STAKE_BASE_URL=https://stake1017.com
     base_url = os.getenv("STAKE_BASE_URL", "https://stake.com")
 
+    # Alternative auth: put the entire Cookie header from your browser in a
+    # file (DevTools → Network → any request → 'cookie' header) and point
+    # STAKE_COOKIE_FILE at it. Falls back to ./cookie.txt if it exists.
+    cookie_file = os.getenv("STAKE_COOKIE_FILE")
+    if not cookie_file and os.path.exists("cookie.txt"):
+        cookie_file = "cookie.txt"
+
     async with StakeAPI(
         access_token=access_token,
         session_cookie=session_cookie,
         cf_clearance=cf_clearance,
         user_agent=user_agent,
         base_url=base_url,
+        cookie_file=cookie_file,
     ) as client:
 
         # 1. Get your balance

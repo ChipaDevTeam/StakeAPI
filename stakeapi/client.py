@@ -32,12 +32,16 @@ class StakeAPI:
         base_url: str = "https://stake.com",
         timeout: int = 30,
         rate_limit: int = 10,
+        cookie_file: Optional[str] = None,
+        cookie_string: Optional[str] = None,
     ):
         """
         Initialize the StakeAPI client.
-        
+
         Args:
-            access_token: Your stake.com access token (x-access-token header)
+            access_token: Your stake.com access token (x-access-token header).
+                If omitted but cookies are provided, the 'session' cookie value
+                is used as the access token (they are the same value on stake).
             session_cookie: Session cookie for authentication
             cf_clearance: Cloudflare clearance cookie (required to bypass Cloudflare protection)
             user_agent: Your browser's User-Agent (must match the one used to obtain cf_clearance)
@@ -47,15 +51,53 @@ class StakeAPI:
                 domain you set here.
             timeout: Request timeout in seconds
             rate_limit: Maximum requests per second
+            cookie_file: Path to a file (e.g. "cookie.txt") containing the
+                entire Cookie header copied from your browser (DevTools →
+                Network tab → any request → 'cookie' header). All cookies are
+                sent as-is, and session/cf_clearance/access token are extracted
+                automatically. Takes precedence over cookie_string.
+            cookie_string: The same raw cookie string, passed directly instead
+                of via a file.
 
         Raises:
-            ValidationError: If base_url is not a valid http(s) URL.
+            ValidationError: If base_url is not a valid http(s) URL, or the
+                cookie file is missing/empty/unreadable.
         """
         if not isinstance(base_url, str) or not base_url.startswith(("http://", "https://")):
             raise ValidationError(
                 f"Invalid base_url: {base_url!r}. It must start with http:// or https://, "
                 "e.g. 'https://stake.com' or a mirror like 'https://stake1017.com'."
             )
+
+        # Load cookies from file/string if provided
+        self._cookie_header: Optional[str] = None
+        if cookie_file:
+            try:
+                self._cookie_header = AuthManager.load_cookie_file(cookie_file)
+            except OSError as e:
+                raise ValidationError(
+                    f"Could not read cookie file {cookie_file!r}: {e}. "
+                    "Create it by copying the entire 'cookie' request header from "
+                    "your browser (DevTools → Network tab → any request → Headers)."
+                )
+            except ValueError as e:
+                raise ValidationError(str(e))
+        elif cookie_string:
+            self._cookie_header = " ".join(cookie_string.split())
+
+        if self._cookie_header:
+            parsed = AuthManager.parse_cookie_string(self._cookie_header)
+            if not parsed:
+                raise ValidationError(
+                    "No cookies could be parsed from the provided cookie data. "
+                    "Expected format: 'name1=value1; name2=value2; ...'"
+                )
+            session_cookie = session_cookie or parsed.get("session")
+            cf_clearance = cf_clearance or parsed.get("cf_clearance")
+            # On stake, the x-access-token header carries the same value
+            # as the 'session' cookie
+            access_token = access_token or parsed.get("session")
+
         self.access_token = access_token
         self.session_cookie = session_cookie
         self.cf_clearance = cf_clearance
@@ -96,14 +138,20 @@ class StakeAPI:
         
         if self.access_token:
             headers["X-Access-Token"] = self.access_token
-            
-        # Set up cookies — pass directly to session for reliable delivery
-        cookies = {}
-        if self.session_cookie:
-            cookies["session"] = self.session_cookie
-        if self.cf_clearance:
-            cookies["cf_clearance"] = self.cf_clearance
-            
+
+        # Set up cookies. When a full cookie string was provided (cookie_file /
+        # cookie_string), send it verbatim as the Cookie header — the cookie
+        # jar would mangle values containing commas or quotes (e.g. session_info).
+        cookies = None
+        if self._cookie_header:
+            headers["Cookie"] = self._cookie_header
+        else:
+            cookies = {}
+            if self.session_cookie:
+                cookies["session"] = self.session_cookie
+            if self.cf_clearance:
+                cookies["cf_clearance"] = self.cf_clearance
+
         timeout = aiohttp.ClientTimeout(total=self.timeout)
         self._session = aiohttp.ClientSession(
             headers=headers,

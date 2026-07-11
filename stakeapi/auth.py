@@ -92,6 +92,65 @@ class AuthManager:
         self._token_expires_at = None
         
     @staticmethod
+    def parse_cookie_string(cookie_string: str) -> Dict[str, str]:
+        """
+        Parse a raw browser cookie string into a dictionary.
+
+        Accepts the value of the Cookie header as copied from the browser's
+        DevTools (Network tab → request → 'cookie' header), e.g.:
+        "cf_clearance=abc; session=def; locale=en"
+
+        A leading "Cookie:" prefix and line breaks are tolerated.
+
+        Args:
+            cookie_string: Raw cookie header string
+
+        Returns:
+            Dictionary mapping cookie names to values
+        """
+        # Collapse to a single line — files often contain stray newlines
+        cookie_string = " ".join(line.strip() for line in cookie_string.splitlines()).strip()
+        if cookie_string.lower().startswith("cookie:"):
+            cookie_string = cookie_string[len("cookie:"):].strip()
+
+        cookies = {}
+        for part in cookie_string.split(";"):
+            part = part.strip()
+            if not part or "=" not in part:
+                continue
+            name, _, value = part.partition("=")
+            cookies[name.strip()] = value.strip()
+        return cookies
+
+    @staticmethod
+    def load_cookie_file(path: str) -> str:
+        """
+        Load a raw cookie string from a file (e.g. cookie.txt).
+
+        The file should contain the entire Cookie header value copied from
+        the browser. Returns the cleaned, single-line cookie string.
+
+        Args:
+            path: Path to the cookie file
+
+        Returns:
+            Cleaned cookie header string
+
+        Raises:
+            OSError: If the file cannot be read
+            ValueError: If the file is empty
+        """
+        with open(path, "r", encoding="utf-8") as f:
+            raw = f.read()
+
+        cleaned = " ".join(line.strip() for line in raw.splitlines()).strip()
+        if cleaned.lower().startswith("cookie:"):
+            cleaned = cleaned[len("cookie:"):].strip()
+        if not cleaned:
+            raise ValueError(f"Cookie file {path!r} is empty")
+        return cleaned
+
+    @staticmethod
     def extract_access_token_from_curl(curl_command: str) -> Optional[str]:
         """
         Extract access token from curl command.
