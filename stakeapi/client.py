@@ -345,62 +345,68 @@ class StakeAPI:
     async def get_casino_games(self, category: Optional[str] = None) -> List[Game]:
         """
         Get available casino games.
-        
-        Args:
-            category: Filter by game category
-            
-        Returns:
-            List of casino games
+
+        Raises:
+            StakeAPIError: Always — stake has no REST API and the GraphQL
+                query for game lists has not been mapped yet.
         """
-        params = {}
-        if category:
-            params["category"] = category
-            
-        data = await self._request("GET", Endpoints.CASINO_GAMES, params=params)
-        return [Game.from_dict(game) for game in data.get("games", [])]
-        
+        raise StakeAPIError(
+            "get_casino_games is not supported yet: stake.com has no REST API "
+            "and the GraphQL query for game lists has not been mapped. "
+            "Working methods: get_user_balance, get_user_profile, get_bet_history."
+        )
+
     async def get_game_details(self, game_id: str) -> Game:
         """
         Get details for a specific game.
-        
-        Args:
-            game_id: The game identifier
-            
-        Returns:
-            Game details
+
+        Raises:
+            StakeAPIError: Always — see get_casino_games.
         """
-        endpoint = Endpoints.CASINO_GAME_DETAILS.format(game_id=game_id)
-        data = await self._request("GET", endpoint)
-        return Game.from_dict(data)
-        
+        raise StakeAPIError(
+            "get_game_details is not supported yet: stake.com has no REST API "
+            "and the GraphQL query for game details has not been mapped. "
+            "Working methods: get_user_balance, get_user_profile, get_bet_history."
+        )
+
     # Sports Methods
     async def get_sports_events(self, sport: Optional[str] = None) -> List[SportEvent]:
         """
         Get available sports events.
-        
-        Args:
-            sport: Filter by sport type
-            
-        Returns:
-            List of sports events
+
+        Raises:
+            StakeAPIError: Always — see get_casino_games.
         """
-        params = {}
-        if sport:
-            params["sport"] = sport
-            
-        data = await self._request("GET", Endpoints.SPORTS_EVENTS, params=params)
-        return [SportEvent.from_dict(event) for event in data.get("events", [])]
-        
+        raise StakeAPIError(
+            "get_sports_events is not supported yet: stake.com has no REST API "
+            "and the GraphQL query for sports events has not been mapped. "
+            "Working methods: get_user_balance, get_user_profile, get_bet_history."
+        )
+
     # User Methods
     async def get_user_profile(self) -> User:
         """
-        Get current user profile.
-        
+        Get current user profile using GraphQL.
+
         Returns:
             User profile information
         """
-        data = await self._request("GET", Endpoints.USER_PROFILE)
-        return User.from_dict(data)
+        data = await self._graphql_request(
+            GraphQLQueries.USER_PROFILE, operation_name="UserProfile"
+        )
+        user = data.get("user")
+        if not user:
+            raise StakeAPIError(
+                f"No user data in profile response: {data!r}. "
+                "Your session may have expired — refresh your cookies."
+            )
+        return User(
+            id=user["id"],
+            username=user.get("name", ""),
+            email=user.get("email"),
+            verified=bool(user.get("hasEmailVerified")),
+            created_at=_parse_datetime(user.get("createdAt")),
+        )
         
     async def get_user_balance(self) -> Dict[str, Dict[str, float]]:
         """
@@ -460,26 +466,55 @@ class StakeAPI:
     async def place_bet(self, bet_data: Dict[str, Any]) -> Bet:
         """
         Place a bet.
-        
-        Args:
-            bet_data: Bet information
-            
-        Returns:
-            Bet confirmation
+
+        Raises:
+            StakeAPIError: Always — stake has no REST API and the GraphQL
+                mutations for placing bets have not been mapped.
         """
-        data = await self._request("POST", Endpoints.PLACE_BET, data=bet_data)
-        return Bet.from_dict(data)
-        
-    async def get_bet_history(self, limit: int = 50) -> List[Bet]:
+        raise StakeAPIError(
+            "place_bet is not supported yet: stake.com has no REST API and the "
+            "GraphQL mutations for placing bets have not been mapped. "
+            "Working methods: get_user_balance, get_user_profile, get_bet_history."
+        )
+
+    async def get_bet_history(self, limit: int = 50, offset: int = 0) -> List[Bet]:
         """
-        Get user bet history.
-        
+        Get user casino bet history using GraphQL.
+
         Args:
             limit: Maximum number of bets to return
-            
+            offset: Number of bets to skip (for pagination)
+
         Returns:
-            List of bets
+            List of bets, newest first
         """
-        params = {"limit": limit}
-        data = await self._request("GET", Endpoints.BET_HISTORY, params=params)
-        return [Bet.from_dict(bet) for bet in data.get("bets", [])]
+        data = await self._graphql_request(
+            GraphQLQueries.BET_HISTORY,
+            variables={"limit": limit, "offset": offset},
+            operation_name="BetHistory",
+        )
+        entries = (data.get("user") or {}).get("houseBetList") or []
+
+        bets = []
+        for entry in entries:
+            bet = entry.get("bet") or {}
+            if bet.get("__typename") != "CasinoBet":
+                continue
+            payout = float(bet.get("payout") or 0)
+            if bet.get("active"):
+                status = "pending"
+            else:
+                status = "won" if payout > 0 else "lost"
+            bets.append(Bet(
+                id=str(entry.get("id") or bet.get("id", "")),
+                user_id=str((bet.get("user") or {}).get("id", "")),
+                game_id=bet.get("game"),
+                bet_type="casino",
+                amount=str(bet.get("amount") or 0),
+                potential_payout=str(payout),
+                odds=bet.get("payoutMultiplier"),
+                status=status,
+                placed_at=_parse_datetime(bet.get("createdAt") or bet.get("updatedAt")),
+                settled_at=_parse_datetime(bet.get("updatedAt")) if not bet.get("active") else None,
+            ))
+        return bets
