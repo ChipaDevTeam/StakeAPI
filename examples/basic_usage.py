@@ -16,7 +16,6 @@ Authentication (same as balance.py):
 
 import asyncio
 import os
-from decimal import Decimal
 
 import dotenv
 
@@ -99,34 +98,6 @@ async def basic_usage_example():
             print(f"Network problem: {e}")
         except StakeAPIError as e:
             print(f"API error occurred: {e}")
-
-
-async def game_search_example():
-    """Demonstrate searching for specific games."""
-
-    if not has_credentials():
-        print("No credentials found — create cookie.txt or set STAKE_ACCESS_TOKEN in .env")
-        return
-
-    async with make_client() as client:
-        try:
-            # Get all casino games
-            all_games = await client.get_casino_games()
-
-            # Filter by provider
-            pragmatic_games = [g for g in all_games if "pragmatic" in g.provider.lower()]
-            print(f"Pragmatic Play games: {len(pragmatic_games)}")
-
-            # Filter by RTP
-            high_rtp_games = [g for g in all_games if g.rtp and g.rtp > 96.0]
-            print(f"High RTP games (>96%): {len(high_rtp_games)}")
-
-            # Filter by bet limits
-            low_stakes = [g for g in all_games if g.min_bet <= Decimal("0.10")]
-            print(f"Low minimum bet games (≤$0.10): {len(low_stakes)}")
-
-        except StakeAPIError as e:
-            print(f"Error searching games: {e}")
 
 
 async def live_data_example():
