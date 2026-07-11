@@ -31,6 +31,46 @@ def _parse_datetime(value):
         return value  # let pydantic try ISO formats
 
 
+def _bet_from_entry(entry: Dict[str, Any]) -> Optional[Bet]:
+    """Map a house-bet entry (from houseBetList or allHouseBets) to a Bet model.
+
+    Returns None for entries that cannot be mapped (e.g. hidden users or
+    bet types missing required fields).
+    """
+    bet = entry.get("bet") or {}
+    if not bet or bet.get("amount") is None:
+        return None
+    game = entry.get("game") or {}
+    payout = float(bet.get("payout") or 0)
+    active = bet.get("active", False)
+    if active:
+        status = "pending"
+    else:
+        status = "won" if payout > 0 else "lost"
+
+    # CasinoBet.game is an enum string; the outer entry.game is an object
+    inner_game = bet.get("game")
+    game_id = inner_game if isinstance(inner_game, str) else game.get("slug")
+
+    try:
+        return Bet(
+            id=str(entry.get("id") or bet.get("id", "")),
+            user_id=str((bet.get("user") or {}).get("id") or ""),
+            game_id=game_id,
+            game_name=game.get("name"),
+            bet_type=bet.get("__typename", "CasinoBet"),
+            amount=str(bet.get("amount") or 0),
+            currency=bet.get("currency"),
+            potential_payout=str(payout),
+            odds=bet.get("payoutMultiplier"),
+            status=status,
+            placed_at=_parse_datetime(bet.get("createdAt") or bet.get("updatedAt")),
+            settled_at=_parse_datetime(bet.get("updatedAt")) if not active else None,
+        )
+    except Exception:
+        return None
+
+
 class StakeAPI:
     """Main client for interacting with stake.com API."""
     
@@ -176,11 +216,12 @@ class StakeAPI:
             await self._session.close()
             
     async def _request(
-        self, 
-        method: str, 
-        endpoint: str, 
+        self,
+        method: str,
+        endpoint: str,
         params: Optional[Dict] = None,
-        data: Optional[Dict] = None
+        data: Optional[Dict] = None,
+        headers: Optional[Dict[str, str]] = None,
     ) -> Dict[Any, Any]:
         """
         Make an authenticated request to the API.
@@ -207,7 +248,7 @@ class StakeAPI:
 
         try:
             async with self._session.request(
-                method, url, params=params, json=data
+                method, url, params=params, json=data, headers=headers
             ) as response:
                 if response.status == 403:
                     raise StakeAPIError(
@@ -297,7 +338,17 @@ class StakeAPI:
         if operation_name:
             payload["operationName"] = operation_name
 
-        response = await self._request("POST", "/_api/graphql", data=payload)
+        # The site's own client sends these on every GraphQL call
+        extra_headers = None
+        if operation_name:
+            extra_headers = {
+                "X-Operation-Name": operation_name,
+                "X-Operation-Type": "mutation" if query.lstrip().startswith("mutation") else "query",
+            }
+
+        response = await self._request(
+            "POST", "/_api/graphql", data=payload, headers=extra_headers
+        )
 
         if not isinstance(response, dict):
             raise GraphQLError(
