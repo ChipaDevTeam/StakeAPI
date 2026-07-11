@@ -73,23 +73,22 @@ class GraphQLQueries:
     }
     """
     
+    # Validated against the live API (fields confirmed to exist on type User)
     USER_PROFILE = """
     query UserProfile {
       user {
         id
         name
         email
-        isEmailVerified
-        country
-        level
-        statistics {
-          __typename
-        }
+        hasEmailVerified
+        createdAt
         __typename
       }
     }
     """
     
+    # UNVERIFIED DRAFT — this query shape does not match the live schema;
+    # kept only as a starting point for future work
     CASINO_GAMES = """
     query CasinoGames($first: Int, $after: String, $categorySlug: String) {
       casinoGames(first: $first, after: $after, categorySlug: $categorySlug) {
@@ -162,33 +161,33 @@ class GraphQLQueries:
     }
     """
     
+    # Validated against the live API — bet history is user.houseBetList;
+    # 'game' on CasinoBet is a plain enum value (e.g. "dice"), not an object
     BET_HISTORY = """
-    query BetHistory($first: Int, $after: String) {
+    query BetHistory($limit: Int!, $offset: Int!) {
       user {
-        bets(first: $first, after: $after) {
-          edges {
-            node {
+        houseBetList(limit: $limit, offset: $offset) {
+          id
+          iid
+          bet {
+            __typename
+            ... on CasinoBet {
               id
+              active
+              payoutMultiplier
+              payout
               amount
               currency
-              multiplier
-              payout
+              game
               createdAt
               updatedAt
-              outcome
-              game {
+              user {
+                id
                 name
-                slug
                 __typename
               }
               __typename
             }
-            __typename
-          }
-          pageInfo {
-            hasNextPage
-            endCursor
-            __typename
           }
           __typename
         }
