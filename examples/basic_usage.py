@@ -136,20 +136,32 @@ async def betting_example():
 
     async with make_client() as client:
         try:
-            # Check balance first
+            # Check balance first — use whatever currency the account holds
             balance = await client.get_user_balance()
-            usd_balance = balance["available"].get("usd", 0)
-
-            if usd_balance < 10:
-                print("Insufficient balance for demo betting")
+            held = {c: a for c, a in balance["available"].items() if a > 0}
+            if not held:
+                print("No funds available for demo betting")
                 return
+
+            # Pick the currency with the highest USD value
+            rates = (await client.get_currency_rates())["base_rates"]
+            currency = max(held, key=lambda c: held[c] * rates.get(c, 0))
+            rate = rates.get(currency, 0)
+
+            # Use a meaningless stake: ~$0.01 worth, never more than 1% of balance
+            amount = round(0.01 / rate, 8) if rate else held[currency] * 0.01
+            amount = min(amount, held[currency] * 0.01)
+
+            usd_value = amount * rate if rate else 0
+            print(f"Balance: {held[currency]} {currency.upper()}")
+            print(f"Demo stake would be: {amount:.8f} {currency.upper()} (~${usd_value:.4f})")
 
             # Example bet data (modify according to actual API requirements)
             bet_data = {
                 "game_id": "example_game_id",
                 "bet_type": "win",
-                "amount": "1.00",
-                "currency": "USD"
+                "amount": f"{amount:.8f}",
+                "currency": currency,
             }
 
             # Place bet (commented out for safety)
