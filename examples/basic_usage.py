@@ -80,7 +80,16 @@ async def basic_usage_example():
             user = await client.get_user_profile()
             print(f"Welcome, {user.username}!")
             print(f"Account verified: {user.verified}")
-            print(f"Default currency: {user.currency}")
+            print(f"Member since: {user.created_at}")
+
+            # Get bet history
+            print("\nGetting bet history...")
+            bets = await client.get_bet_history(limit=10)
+            if bets:
+                for bet in bets:
+                    print(f"- {bet.game_id}: {bet.amount} → {bet.potential_payout} ({bet.status})")
+            else:
+                print("  (no bets found)")
 
         except PermissionDeniedError as e:
             print(f"Permission denied: {e}")
