@@ -129,6 +129,33 @@ async def game_search_example():
             print(f"Error searching games: {e}")
 
 
+async def live_data_example():
+    """Demonstrate public live data: house bets feed and currency rates."""
+
+    if not has_credentials():
+        print("No credentials found — create cookie.txt or set STAKE_ACCESS_TOKEN in .env")
+        return
+
+    async with make_client() as client:
+        try:
+            # Realtime feed of recent bets across all players
+            print("Getting live house bets feed...")
+            feed = await client.get_all_house_bets(limit=5)
+            for bet in feed:
+                print(f"- {bet.game_name}: {bet.amount} {(bet.currency or '').upper()} "
+                      f"→ {bet.potential_payout} ({bet.status})")
+
+            # Currency exchange rates (vs USD)
+            print("\nGetting currency rates...")
+            rates = await client.get_currency_rates()
+            for currency in ("btc", "eth", "sol", "ltc"):
+                if currency in rates["base_rates"]:
+                    print(f"  {currency.upper()}: ${rates['base_rates'][currency]:,.2f}")
+
+        except StakeAPIError as e:
+            print(f"Error getting live data: {e}")
+
+
 async def betting_example():
     """Demonstrate betting operations (use with caution!)."""
 

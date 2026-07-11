@@ -404,7 +404,7 @@ class StakeAPI:
         raise StakeAPIError(
             "get_casino_games is not supported yet: stake.com has no REST API "
             "and the GraphQL query for game lists has not been mapped. "
-            "Working methods: get_user_balance, get_user_profile, get_bet_history."
+            "Working methods: get_user_balance, get_user_profile, get_bet_history, get_all_house_bets, get_currency_rates."
         )
 
     async def get_game_details(self, game_id: str) -> Game:
@@ -417,7 +417,7 @@ class StakeAPI:
         raise StakeAPIError(
             "get_game_details is not supported yet: stake.com has no REST API "
             "and the GraphQL query for game details has not been mapped. "
-            "Working methods: get_user_balance, get_user_profile, get_bet_history."
+            "Working methods: get_user_balance, get_user_profile, get_bet_history, get_all_house_bets, get_currency_rates."
         )
 
     # Sports Methods
@@ -431,7 +431,7 @@ class StakeAPI:
         raise StakeAPIError(
             "get_sports_events is not supported yet: stake.com has no REST API "
             "and the GraphQL query for sports events has not been mapped. "
-            "Working methods: get_user_balance, get_user_profile, get_bet_history."
+            "Working methods: get_user_balance, get_user_profile, get_bet_history, get_all_house_bets, get_currency_rates."
         )
 
     # User Methods
@@ -525,7 +525,7 @@ class StakeAPI:
         raise StakeAPIError(
             "place_bet is not supported yet: stake.com has no REST API and the "
             "GraphQL mutations for placing bets have not been mapped. "
-            "Working methods: get_user_balance, get_user_profile, get_bet_history."
+            "Working methods: get_user_balance, get_user_profile, get_bet_history, get_all_house_bets, get_currency_rates."
         )
 
     async def get_bet_history(self, limit: int = 50, offset: int = 0) -> List[Bet]:
