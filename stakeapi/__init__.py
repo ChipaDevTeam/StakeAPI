@@ -17,15 +17,27 @@ Example usage:
 """
 
 from .client import StakeAPI
-from .exceptions import StakeAPIError, AuthenticationError, RateLimitError
+from .exceptions import (
+    StakeAPIError,
+    AuthenticationError,
+    RateLimitError,
+    ValidationError,
+    NetworkError,
+    GraphQLError,
+    PermissionDeniedError,
+)
 from .auth import AuthManager
 from ._version import __version__
 
 __all__ = [
     "StakeAPI",
     "AuthManager",
-    "StakeAPIError", 
+    "StakeAPIError",
     "AuthenticationError",
     "RateLimitError",
+    "ValidationError",
+    "NetworkError",
+    "GraphQLError",
+    "PermissionDeniedError",
     "__version__",
 ]

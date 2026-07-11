@@ -21,6 +21,27 @@ class ValidationError(StakeAPIError):
     pass
 
 
+class GraphQLError(StakeAPIError):
+    """Raised when the GraphQL API returns errors.
+
+    Attributes:
+        errors: The raw list of error objects returned by the API.
+    """
+
+    def __init__(self, message: str, errors: list = None):
+        super().__init__(message)
+        self.errors = errors or []
+
+
+class PermissionDeniedError(GraphQLError):
+    """Raised when the API responds with a permission error.
+
+    Usually means the access token / session cookie is invalid, expired,
+    or belongs to a different stake domain (mirror) than the one being used.
+    """
+    pass
+
+
 class NetworkError(StakeAPIError):
     """Raised when network requests fail."""
     pass

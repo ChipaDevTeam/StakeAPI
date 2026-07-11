@@ -6,7 +6,15 @@ import aiohttp
 import json
 from urllib.parse import urljoin
 
-from .exceptions import StakeAPIError, AuthenticationError, RateLimitError
+from .exceptions import (
+    StakeAPIError,
+    AuthenticationError,
+    RateLimitError,
+    NetworkError,
+    GraphQLError,
+    PermissionDeniedError,
+    ValidationError,
+)
 from .models import User, Game, SportEvent, Bet
 from .endpoints import Endpoints
 from .auth import AuthManager
@@ -33,15 +41,26 @@ class StakeAPI:
             session_cookie: Session cookie for authentication
             cf_clearance: Cloudflare clearance cookie (required to bypass Cloudflare protection)
             user_agent: Your browser's User-Agent (must match the one used to obtain cf_clearance)
-            base_url: Base URL for the API
+            base_url: Base URL for the API. Use this to point at a regional
+                mirror, e.g. "https://stake1017.com" or "https://stake.bet".
+                Your cookies (session, cf_clearance) must come from the SAME
+                domain you set here.
             timeout: Request timeout in seconds
             rate_limit: Maximum requests per second
+
+        Raises:
+            ValidationError: If base_url is not a valid http(s) URL.
         """
+        if not isinstance(base_url, str) or not base_url.startswith(("http://", "https://")):
+            raise ValidationError(
+                f"Invalid base_url: {base_url!r}. It must start with http:// or https://, "
+                "e.g. 'https://stake.com' or a mirror like 'https://stake1017.com'."
+            )
         self.access_token = access_token
         self.session_cookie = session_cookie
         self.cf_clearance = cf_clearance
         self.user_agent = user_agent
-        self.base_url = base_url
+        self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.rate_limit = rate_limit
         
@@ -65,8 +84,8 @@ class StakeAPI:
             "Accept": "application/graphql+json, application/json",
             "Accept-Language": "en-US,en;q=0.9",
             "Content-Type": "application/json",
-            "Origin": "https://stake.com",
-            "Referer": "https://stake.com/",
+            "Origin": self.base_url,
+            "Referer": f"{self.base_url}/",
             "Sec-Ch-Ua-Mobile": "?0",
             "Sec-Ch-Ua-Platform": '"Windows"',
             "Sec-Fetch-Dest": "empty",
@@ -120,40 +139,72 @@ class StakeAPI:
             StakeAPIError: For API errors
             AuthenticationError: For authentication errors
             RateLimitError: For rate limit errors
+            NetworkError: For connection failures, timeouts, and non-JSON responses
         """
         if not self._session:
             await self._create_session()
-            
-        url = urljoin(self.base_url, endpoint)
-        
+
+        url = urljoin(self.base_url + "/", endpoint.lstrip("/"))
+
         try:
             async with self._session.request(
                 method, url, params=params, json=data
             ) as response:
                 if response.status == 403:
                     raise StakeAPIError(
-                        "403 Forbidden — Cloudflare is blocking the request. "
-                        "Make sure you provide a valid 'cf_clearance' cookie. "
-                        "To get it: open stake.com in your browser → DevTools (F12) → "
+                        f"403 Forbidden — Cloudflare is blocking the request to {self.base_url}. "
+                        "Make sure you provide a valid 'cf_clearance' cookie obtained from "
+                        f"the SAME domain ({self.base_url}). "
+                        f"To get it: open {self.base_url} in your browser → DevTools (F12) → "
                         "Application tab → Cookies → copy the 'cf_clearance' value. "
                         "Then pass it as: StakeAPI(access_token=..., cf_clearance='...')"
                     )
                 elif response.status == 401:
                     raise AuthenticationError("Invalid access token or unauthorized access")
                 elif response.status == 429:
-                    raise RateLimitError("Rate limit exceeded")
-                
-                response_data = await response.json()
-                
+                    retry_after = response.headers.get("Retry-After")
+                    message = "Rate limit exceeded"
+                    if retry_after:
+                        message += f" — retry after {retry_after} seconds"
+                    raise RateLimitError(message)
+                elif response.status >= 500:
+                    raise StakeAPIError(
+                        f"Server error {response.status} from {self.base_url}. "
+                        "The site may be down or the mirror may be unavailable — "
+                        "try again later or switch base_url to another mirror."
+                    )
+
+                try:
+                    response_data = await response.json(content_type=None)
+                except (json.JSONDecodeError, aiohttp.ContentTypeError, ValueError):
+                    body_preview = (await response.text())[:200]
+                    raise NetworkError(
+                        f"Expected JSON but got a non-JSON response (status {response.status}) "
+                        f"from {url}. This usually means a Cloudflare challenge page or a "
+                        f"redirect to a login page. Response starts with: {body_preview!r}"
+                    )
+
                 if response.status >= 400:
                     raise StakeAPIError(f"API error: {response.status} - {response_data}")
-                    
+
                 return response_data
-                
-        except (StakeAPIError, AuthenticationError, RateLimitError):
+
+        except StakeAPIError:
             raise
+        except asyncio.TimeoutError:
+            raise NetworkError(
+                f"Request to {url} timed out after {self.timeout}s. "
+                "Check your connection, or the domain may be blocked/unreachable "
+                "from your network — try another mirror via base_url."
+            )
+        except aiohttp.ClientConnectorError as e:
+            raise NetworkError(
+                f"Could not connect to {self.base_url}: {e}. "
+                "The domain may be blocked in your region or does not exist — "
+                "you can pass a different mirror, e.g. StakeAPI(base_url='https://stake1017.com')."
+            )
         except aiohttp.ClientError as e:
-            raise StakeAPIError(f"Request failed: {e}")
+            raise NetworkError(f"Request failed: {e}")
     
     async def _graphql_request(
         self,
@@ -173,27 +224,63 @@ class StakeAPI:
             GraphQL response data
             
         Raises:
-            StakeAPIError: For API errors
+            GraphQLError: When the API returns GraphQL-level errors
+            PermissionDeniedError: When the API rejects the request as unauthorized
             AuthenticationError: For authentication errors
         """
         payload = {
             "query": query,
         }
-        
+
         if variables:
             payload["variables"] = variables
-            
+
         if operation_name:
             payload["operationName"] = operation_name
-            
+
         response = await self._request("POST", "/_api/graphql", data=payload)
-        
+
+        if not isinstance(response, dict):
+            raise GraphQLError(
+                f"Unexpected GraphQL response type: {type(response).__name__} - {response!r}"
+            )
+
         # Check for GraphQL errors
-        if "errors" in response:
-            error_messages = [error.get("message", "Unknown error") for error in response["errors"]]
-            raise StakeAPIError(f"GraphQL errors: {', '.join(error_messages)}")
-            
-        return response.get("data", {})
+        errors = response.get("errors")
+        if errors:
+            error_messages = [error.get("message", "Unknown error") for error in errors]
+            error_types = [
+                error.get("errorType") or error.get("extensions", {}).get("code", "")
+                for error in errors
+            ]
+            joined = ", ".join(error_messages)
+
+            permission_markers = ("not allowed", "unauthorized", "permission", "forbidden")
+            if any(
+                marker in msg.lower()
+                for msg in error_messages + error_types
+                for marker in permission_markers
+            ):
+                raise PermissionDeniedError(
+                    f"GraphQL permission error: {joined}. This usually means: "
+                    "1) your access token is invalid or expired — get a fresh one from "
+                    f"{self.base_url} (DevTools → any GraphQL request → 'x-access-token' header); "
+                    "2) your session/cf_clearance cookies were obtained from a different domain "
+                    f"than base_url ({self.base_url}) — token and cookies must all come from the "
+                    "same mirror; or 3) your account lacks permission for this operation.",
+                    errors=errors,
+                )
+
+            raise GraphQLError(f"GraphQL errors: {joined}", errors=errors)
+
+        data = response.get("data")
+        if data is None:
+            raise GraphQLError(
+                "GraphQL response contained no data and no errors — "
+                f"raw response: {response!r}"
+            )
+
+        return data
             
     # Casino Methods
     async def get_casino_games(self, category: Optional[str] = None) -> List[Game]:

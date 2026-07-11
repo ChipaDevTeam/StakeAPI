@@ -1,5 +1,12 @@
 import asyncio
-from stakeapi import StakeAPI
+from stakeapi import (
+    StakeAPI,
+    AuthenticationError,
+    PermissionDeniedError,
+    NetworkError,
+    RateLimitError,
+    StakeAPIError,
+)
 import dotenv
 import os
 
@@ -11,8 +18,18 @@ async def main():
     session_cookie = os.getenv("STAKE_SESSION_COOKIE")
     cf_clearance = os.getenv("STAKE_CF_CLEARANCE")
     user_agent = os.getenv("STAKE_USER_AGENT")
-    async with StakeAPI(access_token=access_token, session_cookie=session_cookie, cf_clearance=cf_clearance, user_agent=user_agent) as client:
-        
+    # Use a regional mirror if stake.com is blocked in your country,
+    # e.g. STAKE_BASE_URL=https://stake1017.com
+    base_url = os.getenv("STAKE_BASE_URL", "https://stake.com")
+
+    async with StakeAPI(
+        access_token=access_token,
+        session_cookie=session_cookie,
+        cf_clearance=cf_clearance,
+        user_agent=user_agent,
+        base_url=base_url,
+    ) as client:
+
         # 1. Get your balance
         balance = await client.get_user_balance()
         print("💰 Your Balance:")
@@ -25,4 +42,17 @@ async def main():
         else:
             print("  (no balance data returned)")
 
-asyncio.run(main())
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except PermissionDeniedError as e:
+        print(f"❌ Permission denied: {e}")
+    except AuthenticationError as e:
+        print(f"❌ Authentication failed: {e}")
+    except RateLimitError as e:
+        print(f"❌ Rate limited: {e}")
+    except NetworkError as e:
+        print(f"❌ Network problem: {e}")
+    except StakeAPIError as e:
+        print(f"❌ API error: {e}")
