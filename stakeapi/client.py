@@ -545,27 +545,53 @@ class StakeAPI:
             operation_name="BetHistory",
         )
         entries = (data.get("user") or {}).get("houseBetList") or []
+        return [b for b in (_bet_from_entry(e) for e in entries) if b]
 
-        bets = []
-        for entry in entries:
-            bet = entry.get("bet") or {}
-            if bet.get("__typename") != "CasinoBet":
-                continue
-            payout = float(bet.get("payout") or 0)
-            if bet.get("active"):
-                status = "pending"
-            else:
-                status = "won" if payout > 0 else "lost"
-            bets.append(Bet(
-                id=str(entry.get("id") or bet.get("id", "")),
-                user_id=str((bet.get("user") or {}).get("id", "")),
-                game_id=bet.get("game"),
-                bet_type="casino",
-                amount=str(bet.get("amount") or 0),
-                potential_payout=str(payout),
-                odds=bet.get("payoutMultiplier"),
-                status=status,
-                placed_at=_parse_datetime(bet.get("createdAt") or bet.get("updatedAt")),
-                settled_at=_parse_datetime(bet.get("updatedAt")) if not bet.get("active") else None,
-            ))
-        return bets
+    async def get_all_house_bets(self, limit: int = 10) -> List[Bet]:
+        """
+        Get the public realtime feed of recent house bets across all players.
+
+        This is the same data shown in the site's live bets board. Bets by
+        users who hide their bets have an empty user_id.
+
+        Args:
+            limit: Maximum number of bets to return
+
+        Returns:
+            List of recent bets across all bet types
+        """
+        data = await self._graphql_request(
+            GraphQLQueries.ALL_HOUSE_BETS,
+            variables={"limit": limit},
+            operation_name="AllHouseBets",
+        )
+        entries = data.get("allHouseBets") or []
+        return [b for b in (_bet_from_entry(e) for e in entries) if b]
+
+    # Currency Methods
+    async def get_currency_rates(self) -> Dict[str, Any]:
+        """
+        Get currency configuration: exchange rates and fiat currency lists.
+
+        Returns:
+            Dictionary with:
+                base_rates: {currency: rate_in_usd}, e.g. {"btc": 64226.07, ...}
+                launched_fiat: fiat currencies available on the site
+                display_fiat: fiat currencies available for display
+        """
+        data = await self._graphql_request(
+            GraphQLQueries.CURRENCY_CONFIGURATION,
+            variables={"isAcp": False},
+            operation_name="CurrencyConfiguration",
+        )
+        config = data.get("currencyConfiguration") or {}
+        rates = {
+            r["currency"]: r["baseRate"]
+            for r in config.get("baseRates") or []
+            if r.get("currency") is not None
+        }
+        return {
+            "base_rates": rates,
+            "launched_fiat": config.get("launchedFiatCurrencies") or [],
+            "display_fiat": config.get("displayFiatCurrencies") or [],
+        }
