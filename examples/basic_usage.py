@@ -203,8 +203,8 @@ async def main():
 
     print("\n" + "="*50 + "\n")
 
-    print("2. Game Search Example")
-    await game_search_example()
+    print("2. Live Data Example")
+    await live_data_example()
 
     print("\n" + "="*50 + "\n")
 
