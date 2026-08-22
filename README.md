@@ -1,5 +1,8 @@
 # StakeAPI
 
+> **📈 Trading crypto too? [ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS) is our own perpetuals exchange — and it has a Python API.**
+> `pip install chipax` gives you perps on real [Hyperliquid](https://hyperliquid.xyz) liquidity, plus a free **$100,000 paper account** that charges the same fees and enforces the same leverage caps as live trading. No deposit or KYC to practise. → [chipax-python](https://github.com/ChipaDevTeam/chipax-python)
+
 **Join our affiliate link**: https://stake.com/?c=WY7953wQ
 > **✨ Build with [Chipa Editor](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=StakeAPI&utm_term=support&utm_content=header) — the AI-powered strategy editor for Traders. Try it free!**
 
