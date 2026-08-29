@@ -1,3 +1,4 @@
+# flake8: noqa
 """
 Example showing how to extract credentials from curl and use StakeAPI.
 
@@ -6,17 +7,17 @@ and use them with the StakeAPI client.
 """
 
 import asyncio
-import os
+
 from stakeapi import StakeAPI
 from stakeapi.auth import AuthManager
-from stakeapi.exceptions import StakeAPIError, AuthenticationError
+from stakeapi.exceptions import AuthenticationError, StakeAPIError
 
 
 def extract_credentials_from_curl():
     """
     Extract credentials from the provided curl command.
     """
-    curl_command = '''
+    curl_command = """
     curl "https://stake.com/_api/graphql" \
       -H "accept: application/graphql+json, application/json" \
       -H "accept-language: en-US,en;q=0.9,es;q=0.8,fr;q=0.7" \
@@ -35,14 +36,14 @@ def extract_credentials_from_curl():
       -H "x-access-token: " \
       -H "x-language: en" \
       --data-raw '{"query":"query UserBalances {\n  user {\n    id\n    balances {\n      available {\n        amount\n        currency\n        __typename\n      }\n      vault {\n        amount\n        currency\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n}\n","operationName":"UserBalances"}'
-    '''
-    
+    """
+
     # Extract access token
     access_token = AuthManager.extract_access_token_from_curl(curl_command)
-    
+
     # Extract session cookie
     session_cookie = AuthManager.extract_session_from_curl(curl_command)
-    
+
     return access_token, session_cookie
 
 
@@ -52,30 +53,32 @@ async def get_balance_example():
     """
     # You can either extract from curl or set manually
     access_token, session_cookie = extract_credentials_from_curl()
-    
+
     # Or set them manually if you have them
     # access_token = "your_access_token_here"
     # session_cookie = "your_session_cookie_here"
-    
+
     if not access_token:
         print("❌ Could not extract access token from curl command")
         print("Please update the curl command with your actual tokens")
         return
-    
+
     print("✅ Extracted credentials successfully")
     print(f"Access Token: {access_token[:20]}...")
     if session_cookie:
         print(f"Session Cookie: {session_cookie[:20]}...")
-    
+
     # Create client with extracted credentials
-    async with StakeAPI(access_token=access_token, session_cookie=session_cookie) as client:
+    async with StakeAPI(
+        access_token=access_token, session_cookie=session_cookie
+    ) as client:
         try:
             print("\n🔄 Fetching user balance...")
             balance = await client.get_user_balance()
-            
+
             print("\n💰 Account Balance:")
             print("=" * 40)
-            
+
             # Display available balances
             if balance["available"]:
                 print("\n📊 Available Balances:")
@@ -84,7 +87,7 @@ async def get_balance_example():
                         print(f"  {currency.upper()}: {amount}")
             else:
                 print("\n📊 Available Balances: None")
-            
+
             # Display vault balances
             if balance["vault"]:
                 print("\n🏦 Vault Balances:")
@@ -93,7 +96,7 @@ async def get_balance_example():
                         print(f"  {currency.upper()}: {amount}")
             else:
                 print("\n🏦 Vault Balances: None")
-                
+
         except AuthenticationError:
             print("❌ Authentication failed. Your tokens may have expired.")
             print("Please get new tokens from stake.com and update the curl command.")
@@ -109,9 +112,9 @@ async def main():
     """
     print("🎰 StakeAPI Balance Example")
     print("=" * 50)
-    
+
     await get_balance_example()
-    
+
     print("\n" + "=" * 50)
     print("📝 How to get your tokens:")
     print("1. Go to stake.com and log in")

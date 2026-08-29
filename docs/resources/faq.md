@@ -31,7 +31,7 @@ Yes! StakeAPI is open source under the MIT license. You can use it for personal 
 
 ### What Python versions are supported?
 
-Python 3.8 and above (3.8, 3.9, 3.10, 3.11, 3.12).
+Python 3.10 and above (3.10, 3.11, 3.12, 3.13, 3.14).
 
 ---
 

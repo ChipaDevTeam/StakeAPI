@@ -33,14 +33,14 @@ async def fast_dashboard():
         # balance = await client.get_user_balance()
         # games = await client.get_casino_games()
         # events = await client.get_sports_events()
-        
+
         # ✅ FAST — Concurrent (1 round trip)
         balance, games, events = await asyncio.gather(
             client.get_user_balance(),
             client.get_casino_games(),
             client.get_sports_events(),
         )
-        
+
         print(f"Balance: {balance}")
         print(f"Games: {len(games)}")
         print(f"Events: {len(events)}")
@@ -114,19 +114,19 @@ class CachedStakeAPI:
         self.client = client
         self._cache = {}
         self._cache_ttl = {}
-    
+
     async def get_cached(self, key, fetcher, ttl=60):
         """Get cached result or fetch fresh data."""
         now = time.time()
-        
+
         if key in self._cache and now < self._cache_ttl.get(key, 0):
             return self._cache[key]
-        
+
         result = await fetcher()
         self._cache[key] = result
         self._cache_ttl[key] = now + ttl
         return result
-    
+
     async def get_games_cached(self, category=None):
         """Casino games change infrequently — cache for 5 minutes."""
         key = f"games:{category}"
@@ -135,7 +135,7 @@ class CachedStakeAPI:
             lambda: self.client.get_casino_games(category=category),
             ttl=300
         )
-    
+
     async def get_balance_cached(self):
         """Balance changes often — cache for 10 seconds."""
         return await self.get_cached(
@@ -175,11 +175,11 @@ Don't fire thousands of requests at once — use semaphores:
 ```python
 async def batch_fetch(client, ids, max_concurrent=10):
     semaphore = asyncio.Semaphore(max_concurrent)
-    
+
     async def fetch_one(id):
         async with semaphore:
             return await client.get_game_details(id)
-    
+
     return await asyncio.gather(*[fetch_one(id) for id in ids])
 ```
 

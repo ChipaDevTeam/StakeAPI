@@ -27,7 +27,7 @@ Each step is covered in detail in the pages below. Most developers are up and ru
 
 ## Prerequisites
 
-- Python 3.8 or higher
+- Python 3.10 or higher
 - A [Stake.com account](https://stake.com/?c=WY7953wQ)
 - Basic knowledge of Python and async/await
 

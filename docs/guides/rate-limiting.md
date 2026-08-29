@@ -52,7 +52,7 @@ async def fetch_with_backoff(client, max_retries=5):
             wait = 2 ** attempt  # 1, 2, 4, 8, 16 seconds
             print(f"Rate limited! Waiting {wait}s (attempt {attempt + 1}/{max_retries})")
             await asyncio.sleep(wait)
-    
+
     raise Exception("Exceeded maximum retries")
 ```
 
@@ -66,20 +66,20 @@ import time
 
 class RateLimiter:
     """Simple token bucket rate limiter."""
-    
+
     def __init__(self, requests_per_second: int = 10):
         self.rate = requests_per_second
         self.tokens = requests_per_second
         self.last_refill = time.monotonic()
         self._lock = asyncio.Lock()
-    
+
     async def acquire(self):
         async with self._lock:
             now = time.monotonic()
             elapsed = now - self.last_refill
             self.tokens = min(self.rate, self.tokens + elapsed * self.rate)
             self.last_refill = now
-            
+
             if self.tokens < 1:
                 wait_time = (1 - self.tokens) / self.rate
                 await asyncio.sleep(wait_time)
@@ -108,7 +108,7 @@ async def batch_fetch(client, game_ids: list, concurrency: int = 5):
     """Fetch multiple games with controlled concurrency."""
     semaphore = asyncio.Semaphore(concurrency)
     results = []
-    
+
     async def fetch_one(game_id):
         async with semaphore:
             try:
@@ -118,7 +118,7 @@ async def batch_fetch(client, game_ids: list, concurrency: int = 5):
                 await asyncio.sleep(2)
                 game = await client.get_game_details(game_id)
                 results.append(game)
-    
+
     await asyncio.gather(*[fetch_one(gid) for gid in game_ids])
     return results
 ```

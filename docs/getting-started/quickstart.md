@@ -17,7 +17,7 @@ Go from zero to your first API call in under 60 seconds.
 
 Before continuing, make sure you have:
 
-- [x] Python 3.8+ installed
+- [x] Python 3.10+ installed
 - [x] StakeAPI installed (`pip install stakeapi`)
 - [x] A [Stake.com account](https://stake.com/?c=WY7953wQ) with an access token
 
@@ -34,20 +34,20 @@ from stakeapi import StakeAPI
 async def main():
     # Replace with your actual access token
     async with StakeAPI(access_token="your_access_token_here") as client:
-        
+
         # 1. Get your balance
         balance = await client.get_user_balance()
         print("💰 Your Balance:")
         for currency, amount in balance["available"].items():
             if amount > 0:
                 print(f"  {currency.upper()}: {amount}")
-        
+
         # 2. Browse casino games
         games = await client.get_casino_games(category="slots")
         print(f"\n🎰 Found {len(games)} slot games!")
         for game in games[:5]:
             print(f"  - {game.name} by {game.provider}")
-        
+
         # 3. Check sports events
         events = await client.get_sports_events(sport="football")
         print(f"\n⚽ Found {len(events)} football events!")
@@ -80,7 +80,7 @@ async def main():
     if not token:
         print("Set STAKE_ACCESS_TOKEN environment variable!")
         return
-    
+
     async with StakeAPI(access_token=token) as client:
         balance = await client.get_user_balance()
         print(balance)
@@ -126,7 +126,7 @@ async def main():
             client.get_casino_games(),
             client.get_sports_events(),
         )
-        
+
         print(f"Balance: {balance}")
         print(f"Games: {len(games)}")
         print(f"Events: {len(events)}")

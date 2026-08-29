@@ -1,8 +1,9 @@
 """Test configuration and fixtures."""
 
+from unittest.mock import AsyncMock, Mock
+
 import pytest
-import asyncio
-from unittest.mock import Mock, AsyncMock
+
 from stakeapi import StakeAPI
 
 
@@ -38,7 +39,7 @@ def sample_user_data():
         "verified": True,
         "created_at": "2025-01-01T00:00:00Z",
         "country": "US",
-        "currency": "USD"
+        "currency": "USD",
     }
 
 
@@ -56,7 +57,7 @@ def sample_game_data():
         "rtp": 96.5,
         "volatility": "medium",
         "features": ["free_spins", "wilds"],
-        "thumbnail_url": "https://example.com/thumb.jpg"
+        "thumbnail_url": "https://example.com/thumb.jpg",
     }
 
 
@@ -72,5 +73,5 @@ def sample_sport_event_data():
         "start_time": "2025-01-15T15:00:00Z",
         "status": "upcoming",
         "odds": {"home": 2.5, "away": 3.2, "draw": 3.0},
-        "live": False
+        "live": False,
     }

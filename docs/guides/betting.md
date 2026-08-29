@@ -36,7 +36,7 @@ async def place_a_bet():
             "currency": "btc",
             "bet_type": "single"
         })
-        
+
         print(f"✅ Bet placed!")
         print(f"   Bet ID: {bet.id}")
         print(f"   Amount: {bet.amount}")
@@ -54,10 +54,10 @@ Retrieve your recent bets with full details:
 async def view_bet_history():
     async with StakeAPI(access_token="your_token") as client:
         bets = await client.get_bet_history(limit=50)
-        
+
         print(f"📋 BET HISTORY ({len(bets)} bets)")
         print("=" * 70)
-        
+
         for bet in bets:
             status_icon = {
                 "won": "🟢",
@@ -65,7 +65,7 @@ async def view_bet_history():
                 "pending": "🟡",
                 "cancelled": "⚪"
             }.get(bet.status, "❓")
-            
+
             print(f"\n{status_icon} Bet #{bet.id}")
             print(f"   Amount: {bet.amount}")
             print(f"   Payout: {bet.potential_payout}")
@@ -92,9 +92,9 @@ async with StakeAPI(access_token="your_token") as client:
         variables={"first": 20},
         operation_name="BetHistory"
     )
-    
+
     bets = data.get("user", {}).get("bets", {}).get("edges", [])
-    
+
     for edge in bets:
         bet = edge["node"]
         print(f"Game: {bet['game']['name']}")
@@ -115,24 +115,24 @@ from decimal import Decimal
 async def betting_analytics():
     async with StakeAPI(access_token="your_token") as client:
         bets = await client.get_bet_history(limit=100)
-        
+
         if not bets:
             print("No bet history found")
             return
-        
+
         # Basic stats
         total = len(bets)
         won = [b for b in bets if b.status == "won"]
         lost = [b for b in bets if b.status == "lost"]
         pending = [b for b in bets if b.status == "pending"]
-        
+
         total_wagered = sum(b.amount for b in bets)
         total_won = sum(b.potential_payout for b in won)
         net_profit = total_won - total_wagered
-        
+
         win_rate = len(won) / total * 100 if total > 0 else 0
         roi = float(net_profit / total_wagered * 100) if total_wagered > 0 else 0
-        
+
         print("📊 BETTING PERFORMANCE")
         print("=" * 50)
         print(f"  Total Bets:      {total}")
@@ -143,20 +143,20 @@ async def betting_analytics():
         print(f"  Total Won:       {total_won}")
         print(f"  Net Profit:      {net_profit}")
         print(f"  ROI:             {roi:+.2f}%")
-        
+
         # Biggest win
         if won:
             biggest = max(won, key=lambda b: b.potential_payout)
             print(f"\n🏆 Biggest Win:")
             print(f"  Amount: {biggest.amount} → Payout: {biggest.potential_payout}")
             print(f"  Odds: {biggest.odds}")
-        
+
         # Streaks
         current_streak = 0
         best_win_streak = 0
         worst_loss_streak = 0
         temp_streak = 0
-        
+
         for bet in sorted(bets, key=lambda b: b.placed_at):
             if bet.status == "won":
                 if temp_streak > 0:
@@ -170,7 +170,7 @@ async def betting_analytics():
                 else:
                     temp_streak = -1
                 worst_loss_streak = max(worst_loss_streak, abs(temp_streak))
-        
+
         print(f"\n📈 Streaks:")
         print(f"  Best Win Streak:   {best_win_streak}")
         print(f"  Worst Loss Streak: {worst_loss_streak}")
@@ -203,29 +203,29 @@ from datetime import datetime, timedelta
 async def daily_pnl():
     async with StakeAPI(access_token="your_token") as client:
         bets = await client.get_bet_history(limit=100)
-        
+
         # Group by day
         daily = {}
         for bet in bets:
             day = bet.placed_at.strftime("%Y-%m-%d")
             if day not in daily:
                 daily[day] = {"wagered": Decimal(0), "won": Decimal(0), "count": 0}
-            
+
             daily[day]["wagered"] += bet.amount
             daily[day]["count"] += 1
-            
+
             if bet.status == "won":
                 daily[day]["won"] += bet.potential_payout
-        
+
         print("📅 DAILY PROFIT/LOSS")
         print("=" * 60)
-        
+
         running_total = Decimal(0)
         for day in sorted(daily.keys()):
             d = daily[day]
             pnl = d["won"] - d["wagered"]
             running_total += pnl
-            
+
             icon = "🟢" if pnl >= 0 else "🔴"
             print(f"  {day}  {icon} {float(pnl):+10.4f}  "
                   f"(Bets: {d['count']}, Running: {float(running_total):+.4f})")
