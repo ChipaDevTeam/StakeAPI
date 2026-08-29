@@ -102,13 +102,13 @@ asyncio.run(main())
 
 ## Supported Python Versions
 
-StakeAPI supports Python 3.8 and above:
+StakeAPI supports Python 3.10 and above:
 
-- Python 3.8
-- Python 3.9
 - Python 3.10
 - Python 3.11
 - Python 3.12
+- Python 3.13
+- Python 3.14
 
 ## Community & Support
 

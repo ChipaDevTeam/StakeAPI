@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.8, 3.9, "3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
 
     steps:
     - uses: actions/checkout@v3
@@ -28,15 +28,15 @@ jobs:
 
     - name: Lint with flake8
       run: |
-        flake8 stakeapi tests examples
+        flake8 --max-line-length=88 --extend-ignore=E203 stakeapi tests examples
 
     - name: Check formatting with black
       run: |
-        black --check stakeapi tests examples
+        black --check --line-length 88 stakeapi tests examples
 
     - name: Check import sorting with isort
       run: |
-        isort --check-only stakeapi tests examples
+        isort --check-only --profile black --line-length 88 stakeapi tests examples
 
     - name: Type check with mypy
       run: |
@@ -64,7 +64,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: "3.11"
+        python-version: "3.12"
 
     - name: Install build dependencies
       run: |

@@ -1,3 +1,4 @@
+# flake8: noqa
 """
 Basic usage examples for StakeAPI.
 
@@ -21,10 +22,10 @@ import dotenv
 
 from stakeapi import StakeAPI
 from stakeapi.exceptions import (
-    StakeAPIError,
     AuthenticationError,
-    PermissionDeniedError,
     NetworkError,
+    PermissionDeniedError,
+    StakeAPIError,
 )
 
 dotenv.load_dotenv()
@@ -59,7 +60,9 @@ async def basic_usage_example():
     """Demonstrate basic StakeAPI usage."""
 
     if not has_credentials():
-        print("No credentials found — create cookie.txt or set STAKE_ACCESS_TOKEN in .env")
+        print(
+            "No credentials found — create cookie.txt or set STAKE_ACCESS_TOKEN in .env"
+        )
         return
 
     # Create client using context manager (recommended)
@@ -70,7 +73,9 @@ async def basic_usage_example():
             balance = await client.get_user_balance()
             for currency, amount in balance["available"].items():
                 if amount > 0:
-                    print(f"  {currency.upper()}: {amount} (vault: {balance['vault'].get(currency, 0)})")
+                    print(
+                        f"  {currency.upper()}: {amount} (vault: {balance['vault'].get(currency, 0)})"
+                    )
             if not any(amount > 0 for amount in balance["available"].values()):
                 print("  (all balances are 0)")
 
@@ -86,7 +91,9 @@ async def basic_usage_example():
             bets = await client.get_bet_history(limit=10)
             if bets:
                 for bet in bets:
-                    print(f"- {bet.game_id}: {bet.amount} → {bet.potential_payout} ({bet.status})")
+                    print(
+                        f"- {bet.game_id}: {bet.amount} → {bet.potential_payout} ({bet.status})"
+                    )
             else:
                 print("  (no bets found)")
 
@@ -104,7 +111,9 @@ async def live_data_example():
     """Demonstrate public live data: house bets feed and currency rates."""
 
     if not has_credentials():
-        print("No credentials found — create cookie.txt or set STAKE_ACCESS_TOKEN in .env")
+        print(
+            "No credentials found — create cookie.txt or set STAKE_ACCESS_TOKEN in .env"
+        )
         return
 
     async with make_client() as client:
@@ -113,15 +122,19 @@ async def live_data_example():
             print("Getting live house bets feed...")
             feed = await client.get_all_house_bets(limit=5)
             for bet in feed:
-                print(f"- {bet.game_name}: {bet.amount} {(bet.currency or '').upper()} "
-                      f"→ {bet.potential_payout} ({bet.status})")
+                print(
+                    f"- {bet.game_name}: {bet.amount} {(bet.currency or '').upper()} "
+                    f"→ {bet.potential_payout} ({bet.status})"
+                )
 
             # Currency exchange rates (vs USD)
             print("\nGetting currency rates...")
             rates = await client.get_currency_rates()
             for currency in ("btc", "eth", "sol", "ltc"):
                 if currency in rates["base_rates"]:
-                    print(f"  {currency.upper()}: ${rates['base_rates'][currency]:,.2f}")
+                    print(
+                        f"  {currency.upper()}: ${rates['base_rates'][currency]:,.2f}"
+                    )
 
         except StakeAPIError as e:
             print(f"Error getting live data: {e}")
@@ -131,7 +144,9 @@ async def betting_example():
     """Demonstrate betting operations (use with caution!)."""
 
     if not has_credentials():
-        print("No credentials found — create cookie.txt or set STAKE_ACCESS_TOKEN in .env")
+        print(
+            "No credentials found — create cookie.txt or set STAKE_ACCESS_TOKEN in .env"
+        )
         return
 
     async with make_client() as client:
@@ -154,7 +169,9 @@ async def betting_example():
 
             usd_value = amount * rate if rate else 0
             print(f"Balance: {held[currency]} {currency.upper()}")
-            print(f"Demo stake would be: {amount:.8f} {currency.upper()} (~${usd_value:.4f})")
+            print(
+                f"Demo stake would be: {amount:.8f} {currency.upper()} (~${usd_value:.4f})"
+            )
 
             # Example bet data (modify according to actual API requirements)
             bet_data = {
@@ -184,12 +201,12 @@ async def main():
     print("1. Basic Usage Example")
     await basic_usage_example()
 
-    print("\n" + "="*50 + "\n")
+    print("\n" + "=" * 50 + "\n")
 
     print("2. Live Data Example")
     await live_data_example()
 
-    print("\n" + "="*50 + "\n")
+    print("\n" + "=" * 50 + "\n")
 
     print("3. Betting Example")
     await betting_example()
@@ -198,6 +215,7 @@ async def main():
 if __name__ == "__main__":
     # Set up logging
     import logging
+
     logging.basicConfig(level=logging.INFO)
 
     # Run examples

@@ -42,12 +42,12 @@ async def main():
           }
         }
         """
-        
+
         data = await client._graphql_request(
             query=query,
             operation_name="UserBalances"
         )
-        
+
         print(data)
 
 asyncio.run(main())
@@ -67,7 +67,7 @@ async with StakeAPI(access_token="your_token") as client:
         query=GraphQLQueries.USER_BALANCES,
         operation_name="UserBalances"
     )
-    
+
     for balance in data["user"]["balances"]["available"]:
         print(f"{balance['currency']}: {balance['amount']}")
 ```
@@ -194,28 +194,28 @@ async def get_all_casino_games(client):
     """Fetch all casino games with pagination."""
     all_games = []
     cursor = None
-    
+
     while True:
         variables = {"first": 100}
         if cursor:
             variables["after"] = cursor
-        
+
         data = await client._graphql_request(
             query=GraphQLQueries.CASINO_GAMES,
             variables=variables,
             operation_name="CasinoGames"
         )
-        
+
         edges = data["casinoGames"]["edges"]
         all_games.extend(edge["node"] for edge in edges)
-        
+
         page_info = data["casinoGames"]["pageInfo"]
         if not page_info["hasNextPage"]:
             break
-        
+
         cursor = page_info["endCursor"]
         print(f"Fetched {len(all_games)} games so far...")
-    
+
     return all_games
 ```
 

@@ -30,7 +30,7 @@ async def main():
         # Get all upcoming events
         events = await client.get_sports_events()
         print(f"Total events: {len(events)}")
-        
+
         for event in events[:10]:
             print(f"\n⚽ {event.home_team} vs {event.away_team}")
             print(f"   Sport: {event.sport}")
@@ -38,7 +38,7 @@ async def main():
             print(f"   Start: {event.start_time}")
             print(f"   Status: {event.status}")
             print(f"   Live: {'🔴 LIVE' if event.live else '⏳ Upcoming'}")
-            
+
             if event.odds:
                 print(f"   Odds:")
                 for market, odds in event.odds.items():
@@ -56,11 +56,11 @@ async with StakeAPI(access_token="your_token") as client:
     # Football/Soccer
     football = await client.get_sports_events(sport="football")
     print(f"Football events: {len(football)}")
-    
+
     # Basketball
     basketball = await client.get_sports_events(sport="basketball")
     print(f"Basketball events: {len(basketball)}")
-    
+
     # Tennis
     tennis = await client.get_sports_events(sport="tennis")
     print(f"Tennis events: {len(tennis)}")
@@ -99,14 +99,14 @@ async with StakeAPI(access_token="your_token") as client:
         },
         operation_name="SportsEvents"
     )
-    
+
     for edge in data.get("sportsEvents", {}).get("edges", []):
         event = edge["node"]
         competitors = [c["name"] for c in event.get("competitors", [])]
         print(f"{' vs '.join(competitors)}")
         print(f"  League: {event['league']['name']}")
         print(f"  Start: {event['startTime']}")
-        
+
         # Show markets and odds
         for market in event.get("markets", []):
             print(f"  Market: {market['name']}")
@@ -122,27 +122,27 @@ Build tools to analyze odds and find value:
 async def analyze_odds():
     async with StakeAPI(access_token="your_token") as client:
         events = await client.get_sports_events(sport="football")
-        
+
         print("📊 ODDS ANALYSIS")
         print("=" * 60)
-        
+
         for event in events:
             if not event.odds:
                 continue
-            
+
             home_odds = event.odds.get("home")
             away_odds = event.odds.get("away")
             draw_odds = event.odds.get("draw")
-            
+
             if home_odds and away_odds:
                 # Calculate implied probabilities
                 home_prob = (1 / home_odds) * 100
                 away_prob = (1 / away_odds) * 100
                 draw_prob = (1 / draw_odds) * 100 if draw_odds else 0
-                
+
                 total_prob = home_prob + away_prob + draw_prob
                 margin = total_prob - 100  # Bookmaker margin
-                
+
                 print(f"\n{event.home_team} vs {event.away_team}")
                 print(f"  Home: {home_odds:.2f} ({home_prob:.1f}%)")
                 print(f"  Away: {away_odds:.2f} ({away_prob:.1f}%)")
@@ -161,12 +161,12 @@ Filter for currently live events:
 async def get_live_events():
     async with StakeAPI(access_token="your_token") as client:
         all_events = await client.get_sports_events()
-        
+
         live_events = [e for e in all_events if e.live]
-        
+
         print(f"🔴 LIVE EVENTS ({len(live_events)})")
         print("=" * 50)
-        
+
         for event in live_events:
             print(f"\n  {event.sport.upper()} | {event.league}")
             print(f"  {event.home_team} vs {event.away_team}")
@@ -185,27 +185,27 @@ Find events where the bookmaker margin is lowest (best value for bettors):
 async def find_value_bets():
     async with StakeAPI(access_token="your_token") as client:
         events = await client.get_sports_events()
-        
+
         value_events = []
-        
+
         for event in events:
             if not event.odds or "home" not in event.odds or "away" not in event.odds:
                 continue
-            
+
             total_implied = sum(1/v for v in event.odds.values() if v > 0)
             margin = (total_implied - 1) * 100
-            
+
             value_events.append({
                 "event": event,
                 "margin": margin
             })
-        
+
         # Sort by lowest margin (best value)
         value_events.sort(key=lambda x: x["margin"])
-        
+
         print("💎 BEST VALUE BETS (Lowest Margins)")
         print("=" * 60)
-        
+
         for item in value_events[:15]:
             event = item["event"]
             print(f"\n  {event.home_team} vs {event.away_team}")
@@ -244,24 +244,24 @@ from stakeapi import StakeAPI
 async def sports_dashboard():
     async with StakeAPI(access_token="your_token") as client:
         events = await client.get_sports_events()
-        
+
         print("🏈 SPORTS DASHBOARD")
         print("=" * 60)
         print(f"Total Events: {len(events)}")
-        
+
         # Events by sport
         sports = Counter(e.sport for e in events)
         print("\n📊 Events by Sport:")
         for sport, count in sports.most_common():
             bar = "█" * (count // 2)
             print(f"  {sport:20s} {count:4d} {bar}")
-        
+
         # Live vs upcoming
         live = sum(1 for e in events if e.live)
         upcoming = len(events) - live
         print(f"\n🔴 Live: {live}")
         print(f"⏳ Upcoming: {upcoming}")
-        
+
         # Top leagues
         leagues = Counter(e.league for e in events)
         print("\n🏆 Top 10 Leagues:")

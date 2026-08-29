@@ -9,13 +9,13 @@ try {
     Write-Host "Found Python: $pythonVersion" -ForegroundColor Yellow
 } catch {
     Write-Host "Error: Python is not installed or not in PATH" -ForegroundColor Red
-    Write-Host "Please install Python 3.8 or later from https://python.org" -ForegroundColor Red
+    Write-Host "Please install Python 3.10 or later from https://python.org" -ForegroundColor Red
     exit 1
 }
 
 # Check Python version
 $versionNumber = python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
-$requiredVersion = [version]"3.8"
+$requiredVersion = [version]"3.10"
 $currentVersion = [version]$versionNumber
 if ($currentVersion -lt $requiredVersion) {
     Write-Host "Error: Python $versionNumber found, but Python $requiredVersion or later is required" -ForegroundColor Red

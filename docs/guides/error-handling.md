@@ -47,17 +47,17 @@ async with StakeAPI(access_token="your_token") as client:
     try:
         balance = await client.get_user_balance()
         print(balance)
-        
+
     except AuthenticationError:
         print("Your access token is invalid or expired.")
         print("Get a new token from stake.com")
-        
+
     except RateLimitError:
         print("Too many requests. Slow down!")
-        
+
     except NetworkError:
         print("Network error. Check your internet connection.")
-        
+
     except StakeAPIError as e:
         print(f"API error: {e}")
 ```
@@ -91,7 +91,7 @@ async def request_with_retry(client, max_retries=3):
             wait_time = 2 ** attempt  # Exponential backoff
             print(f"Rate limited. Waiting {wait_time}s...")
             await asyncio.sleep(wait_time)
-    
+
     raise Exception("Max retries exceeded")
 ```
 
@@ -153,34 +153,34 @@ logger = logging.getLogger("stakeapi")
 
 async def robust_api_call(client, method, *args, max_retries=3, **kwargs):
     """Make an API call with automatic retry and error handling."""
-    
+
     for attempt in range(1, max_retries + 1):
         try:
             result = await method(*args, **kwargs)
             return result
-            
+
         except AuthenticationError:
             logger.error("Authentication failed. Token may be expired.")
             raise  # Don't retry auth errors
-            
+
         except RateLimitError:
             wait = 2 ** attempt
             logger.warning(f"Rate limited (attempt {attempt}/{max_retries}). "
                           f"Retrying in {wait}s...")
             await asyncio.sleep(wait)
-            
+
         except NetworkError:
             wait = attempt * 2
             logger.warning(f"Network error (attempt {attempt}/{max_retries}). "
                           f"Retrying in {wait}s...")
             await asyncio.sleep(wait)
-            
+
         except StakeAPIError as e:
             logger.error(f"API error: {e}")
             if attempt == max_retries:
                 raise
             await asyncio.sleep(1)
-    
+
     raise StakeAPIError(f"Failed after {max_retries} attempts")
 
 # Usage:
@@ -200,20 +200,20 @@ async def safe_operation(client):
         balance = await client.get_user_balance()
         games = await client.get_casino_games()
         return {"balance": balance, "games": games}
-        
+
     except AuthenticationError:
         logger.error("AUTH_ERROR: Token invalid or expired")
         return None
-        
+
     except RateLimitError:
         logger.warning("RATE_LIMIT: Too many requests")
         return None
-        
+
     except StakeAPIError as e:
         logger.error(f"API_ERROR: {e}")
         logger.debug(traceback.format_exc())
         return None
-        
+
     except Exception as e:
         logger.critical(f"UNEXPECTED_ERROR: {e}")
         logger.debug(traceback.format_exc())

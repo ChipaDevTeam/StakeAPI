@@ -27,10 +27,10 @@ from stakeapi import StakeAPI
 
 class StakeAnalytics:
     """Comprehensive analytics engine for Stake.com."""
-    
+
     def __init__(self, access_token: str):
         self.access_token = access_token
-    
+
     async def full_report(self):
         async with StakeAPI(access_token=self.access_token) as client:
             # Fetch all data concurrently
@@ -39,33 +39,33 @@ class StakeAnalytics:
                 client.get_bet_history(limit=100),
                 client.get_casino_games(),
             )
-            
+
             self._print_balance_report(balance)
             self._print_betting_report(bets)
             self._print_game_report(games)
-    
+
     def _print_balance_report(self, balance):
         print("\n💰 BALANCE REPORT")
         print("=" * 50)
-        
+
         for category in ["available", "vault"]:
             non_zero = {k: v for k, v in balance[category].items() if v > 0}
             if non_zero:
                 print(f"\n  {category.title()}:")
                 for currency, amount in sorted(non_zero.items()):
                     print(f"    {currency.upper():8s} {amount:.8f}")
-    
+
     def _print_betting_report(self, bets):
         if not bets:
             return
-        
+
         total = len(bets)
         won = sum(1 for b in bets if b.status == "won")
         lost = sum(1 for b in bets if b.status == "lost")
-        
+
         total_wagered = sum(float(b.amount) for b in bets)
         total_won = sum(float(b.potential_payout) for b in bets if b.status == "won")
-        
+
         print("\n📊 BETTING PERFORMANCE")
         print("=" * 50)
         print(f"  Total Bets:    {total}")
@@ -74,27 +74,27 @@ class StakeAnalytics:
         print(f"  Total Wagered: {total_wagered:.6f}")
         print(f"  Total Won:     {total_won:.6f}")
         print(f"  Net P&L:       {total_won - total_wagered:+.6f}")
-        
+
         if total_wagered > 0:
             roi = (total_won - total_wagered) / total_wagered * 100
             print(f"  ROI:           {roi:+.2f}%")
-    
+
     def _print_game_report(self, games):
         print("\n🎰 GAME CATALOG")
         print("=" * 50)
         print(f"  Total Games: {len(games)}")
-        
+
         categories = defaultdict(int)
         providers = defaultdict(int)
-        
+
         for game in games:
             categories[game.category] += 1
             providers[game.provider] += 1
-        
+
         print(f"\n  Categories ({len(categories)}):")
         for cat, count in sorted(categories.items(), key=lambda x: x[1], reverse=True):
             print(f"    {cat:20s} {count:4d}")
-        
+
         print(f"\n  Top 10 Providers:")
         for prov, count in sorted(providers.items(), key=lambda x: x[1], reverse=True)[:10]:
             print(f"    {prov:25s} {count:4d}")
@@ -115,12 +115,12 @@ Deep-dive into game providers to find the best options:
 async def analyze_providers():
     async with StakeAPI(access_token="your_token") as client:
         games = await client.get_casino_games()
-        
+
         providers = defaultdict(lambda: {
             "count": 0, "categories": set(), "rtps": [],
             "min_bets": [], "max_bets": []
         })
-        
+
         for game in games:
             p = providers[game.provider]
             p["count"] += 1
@@ -129,15 +129,15 @@ async def analyze_providers():
                 p["rtps"].append(game.rtp)
             p["min_bets"].append(float(game.min_bet))
             p["max_bets"].append(float(game.max_bet))
-        
+
         print("🏢 PROVIDER DEEP DIVE")
         print("=" * 70)
-        
+
         for name, data in sorted(providers.items(), key=lambda x: x[1]["count"], reverse=True)[:15]:
             avg_rtp = sum(data["rtps"]) / len(data["rtps"]) if data["rtps"] else 0
             avg_min = sum(data["min_bets"]) / len(data["min_bets"])
             avg_max = sum(data["max_bets"]) / len(data["max_bets"])
-            
+
             print(f"\n  🏢 {name}")
             print(f"     Games: {data['count']}")
             print(f"     Categories: {', '.join(sorted(data['categories']))}")
@@ -156,29 +156,29 @@ Automatically find sports events with the best odds:
 async def find_value_bets():
     async with StakeAPI(access_token="your_token") as client:
         events = await client.get_sports_events()
-        
+
         value_bets = []
-        
+
         for event in events:
             if not event.odds or len(event.odds) < 2:
                 continue
-            
+
             # Calculate bookmaker margin
             total_implied = sum(1/v for v in event.odds.values() if v > 0)
             margin = (total_implied - 1) * 100
-            
+
             if margin < 5.0:  # Less than 5% margin = good value
                 value_bets.append({
                     "event": event,
                     "margin": margin,
                     "sport": event.sport,
                 })
-        
+
         value_bets.sort(key=lambda x: x["margin"])
-        
+
         print("💎 VALUE BETS (Lowest Margins)")
         print("=" * 60)
-        
+
         for item in value_bets[:20]:
             e = item["event"]
             print(f"\n  {e.sport.upper()} | {e.league}")
@@ -201,34 +201,34 @@ from datetime import datetime
 
 async def monitor_loop(access_token: str, interval: int = 60):
     """Continuously monitor balance and generate alerts."""
-    
+
     previous_balance = {}
-    
+
     while True:
         try:
             async with StakeAPI(access_token=access_token) as client:
                 balance = await client.get_user_balance()
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                
+
                 for currency, amount in balance["available"].items():
                     if amount <= 0:
                         continue
-                    
+
                     prev = previous_balance.get(currency, amount)
                     change = amount - prev
-                    
+
                     if change > 0:
                         print(f"[{timestamp}] 📈 {currency.upper()}: +{change:.8f} "
                               f"(now: {amount:.8f})")
                     elif change < 0:
                         print(f"[{timestamp}] 📉 {currency.upper()}: {change:.8f} "
                               f"(now: {amount:.8f})")
-                
+
                 previous_balance = balance["available"]
-                
+
         except Exception as e:
             print(f"[{timestamp}] ❌ Error: {e}")
-        
+
         await asyncio.sleep(interval)
 
 asyncio.run(monitor_loop("your_token", interval=30))
@@ -245,14 +245,14 @@ from io import StringIO
 async def export_bets_to_csv():
     async with StakeAPI(access_token="your_token") as client:
         bets = await client.get_bet_history(limit=100)
-        
+
         with open("bet_history.csv", "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow([
                 "ID", "Type", "Amount", "Payout", "Odds",
                 "Status", "Placed At", "Settled At"
             ])
-            
+
             for bet in bets:
                 writer.writerow([
                     bet.id,
@@ -264,7 +264,7 @@ async def export_bets_to_csv():
                     bet.placed_at.isoformat(),
                     bet.settled_at.isoformat() if bet.settled_at else "",
                 ])
-        
+
         print(f"✅ Exported {len(bets)} bets to bet_history.csv")
 
 asyncio.run(export_bets_to_csv())

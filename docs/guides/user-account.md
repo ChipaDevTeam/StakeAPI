@@ -28,7 +28,7 @@ from stakeapi import StakeAPI
 async def main():
     async with StakeAPI(access_token="your_token") as client:
         user = await client.get_user_profile()
-        
+
         print(f"👤 Username: {user.username}")
         print(f"📧 Email: {user.email or 'Not set'}")
         print(f"✅ Verified: {user.verified}")
@@ -47,10 +47,10 @@ This is probably the most commonly used API call. Get your balance across all cr
 async def check_balance():
     async with StakeAPI(access_token="your_token") as client:
         balance = await client.get_user_balance()
-        
+
         print("💰 ACCOUNT BALANCE")
         print("=" * 40)
-        
+
         # Available balance (ready to use)
         print("\n📊 Available:")
         total_available = 0
@@ -58,10 +58,10 @@ async def check_balance():
             if amount > 0:
                 print(f"  {currency.upper():8s} {amount:.8f}")
                 total_available += 1
-        
+
         if total_available == 0:
             print("  No available balance")
-        
+
         # Vault balance (locked/saved)
         print("\n🏦 Vault:")
         total_vault = 0
@@ -69,7 +69,7 @@ async def check_balance():
             if amount > 0:
                 print(f"  {currency.upper():8s} {amount:.8f}")
                 total_vault += 1
-        
+
         if total_vault == 0:
             print("  No vault balance")
 
@@ -88,20 +88,20 @@ from stakeapi import StakeAPI
 async def monitor_balance(interval_seconds: int = 60):
     """Monitor balance changes in real-time."""
     previous_balances = {}
-    
+
     async with StakeAPI(access_token="your_token") as client:
         while True:
             balance = await client.get_user_balance()
             current = balance["available"]
             timestamp = datetime.now().strftime("%H:%M:%S")
-            
+
             for currency, amount in current.items():
                 if amount <= 0:
                     continue
-                    
+
                 prev = previous_balances.get(currency, amount)
                 change = amount - prev
-                
+
                 if change != 0:
                     direction = "📈" if change > 0 else "📉"
                     print(f"[{timestamp}] {direction} {currency.upper()}: "
@@ -109,7 +109,7 @@ async def monitor_balance(interval_seconds: int = 60):
                           f"({change:+.8f})")
                 else:
                     print(f"[{timestamp}] ➖ {currency.upper()}: {amount:.8f} (no change)")
-            
+
             previous_balances = current
             await asyncio.sleep(interval_seconds)
 
@@ -129,7 +129,7 @@ async with StakeAPI(access_token="your_token") as client:
         query=GraphQLQueries.USER_PROFILE,
         operation_name="UserProfile"
     )
-    
+
     user = data.get("user", {})
     print(f"ID: {user.get('id')}")
     print(f"Name: {user.get('name')}")
@@ -190,7 +190,7 @@ async def full_account_summary():
             client.get_user_profile(),
             client.get_user_balance()
         )
-        
+
         print(f"╔{'═' * 48}╗")
         print(f"║  ACCOUNT SUMMARY                                ║")
         print(f"╠{'═' * 48}╣")
@@ -198,18 +198,18 @@ async def full_account_summary():
         print(f"║  Verified: {'✅ Yes' if user.verified else '❌ No':38s} ║")
         print(f"║  Currency: {user.currency:38s} ║")
         print(f"╠{'═' * 48}╣")
-        
+
         available = {k: v for k, v in balance["available"].items() if v > 0}
         vault = {k: v for k, v in balance["vault"].items() if v > 0}
-        
+
         print(f"║  Available Balances: {len(available):27d} ║")
         for cur, amt in available.items():
             print(f"║    {cur.upper():6s} {amt:>38.8f} ║")
-        
+
         print(f"║  Vault Balances: {len(vault):31d} ║")
         for cur, amt in vault.items():
             print(f"║    {cur.upper():6s} {amt:>38.8f} ║")
-        
+
         print(f"╚{'═' * 48}╝")
 
 asyncio.run(full_account_summary())

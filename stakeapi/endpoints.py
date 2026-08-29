@@ -3,46 +3,46 @@
 
 class Endpoints:
     """API endpoint constants."""
-    
+
     # GraphQL endpoint
     GRAPHQL = "/_api/graphql"
-    
+
     # Legacy REST endpoints (if any still exist)
     API_BASE = "/api/v1"
-    
+
     # Authentication
     AUTH_LOGIN = f"{API_BASE}/auth/login"
     AUTH_LOGOUT = f"{API_BASE}/auth/logout"
     AUTH_REFRESH = f"{API_BASE}/auth/refresh"
-    
+
     # User endpoints
     USER_PROFILE = f"{API_BASE}/user/profile"
     USER_BALANCE = f"{API_BASE}/user/balance"
     USER_STATISTICS = f"{API_BASE}/user/statistics"
     USER_TRANSACTIONS = f"{API_BASE}/user/transactions"
-    
+
     # Casino endpoints
     CASINO_GAMES = f"{API_BASE}/casino/games"
     CASINO_GAME_DETAILS = f"{API_BASE}/casino/games/{{game_id}}"
     CASINO_PROVIDERS = f"{API_BASE}/casino/providers"
     CASINO_CATEGORIES = f"{API_BASE}/casino/categories"
-    
+
     # Sports endpoints
     SPORTS_EVENTS = f"{API_BASE}/sports/events"
     SPORTS_EVENT_DETAILS = f"{API_BASE}/sports/events/{{event_id}}"
     SPORTS_LEAGUES = f"{API_BASE}/sports/leagues"
     SPORTS_ODDS = f"{API_BASE}/sports/odds"
-    
+
     # Betting endpoints
     PLACE_BET = f"{API_BASE}/bets/place"
     BET_HISTORY = f"{API_BASE}/bets/history"
     BET_DETAILS = f"{API_BASE}/bets/{{bet_id}}"
     CANCEL_BET = f"{API_BASE}/bets/{{bet_id}}/cancel"
-    
+
     # Live endpoints
     LIVE_GAMES = f"{API_BASE}/live/games"
     LIVE_EVENTS = f"{API_BASE}/live/events"
-    
+
     # Promotions
     PROMOTIONS = f"{API_BASE}/promotions"
     PROMOTION_DETAILS = f"{API_BASE}/promotions/{{promo_id}}"
@@ -50,7 +50,7 @@ class Endpoints:
 
 class GraphQLQueries:
     """GraphQL query constants for stake.com API."""
-    
+
     USER_BALANCES = """
     query UserBalances {
       user {
@@ -72,7 +72,7 @@ class GraphQLQueries:
       }
     }
     """
-    
+
     # Validated against the live API (fields confirmed to exist on type User)
     USER_PROFILE = """
     query UserProfile {
@@ -86,7 +86,7 @@ class GraphQLQueries:
       }
     }
     """
-    
+
     # UNVERIFIED DRAFT — this query shape does not match the live schema;
     # kept only as a starting point for future work
     CASINO_GAMES = """
@@ -120,7 +120,7 @@ class GraphQLQueries:
       }
     }
     """
-    
+
     # Validated against the live API — public realtime feed of house bets
     # across all bet types (captured from the site's own AllHouseBets query)
     ALL_HOUSE_BETS = """
@@ -295,7 +295,7 @@ class GraphQLQueries:
       }
     }
     """
-    
+
     # Validated against the live API — bet history is user.houseBetList;
     # 'game' on the outer Bet is an object, while CasinoBet.game is an enum
     BET_HISTORY = """

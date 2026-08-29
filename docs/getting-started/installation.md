@@ -121,7 +121,7 @@ StakeAPI version: 0.1.0
 
 | Requirement | Minimum |
 |:------------|:--------|
-| Python | 3.8+ |
+| Python | 3.10+ |
 | OS | Windows, macOS, Linux |
 | Memory | 64 MB |
 | Network | Internet connection required |

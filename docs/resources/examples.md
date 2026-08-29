@@ -26,7 +26,7 @@ from stakeapi import StakeAPI
 async def main():
     async with StakeAPI(access_token="your_token") as client:
         balance = await client.get_user_balance()
-        
+
         print("Available:")
         for currency, amount in balance["available"].items():
             if amount > 0:
@@ -63,7 +63,7 @@ async def main():
         # Get slot games
         slots = await client.get_casino_games(category="slots")
         print(f"Found {len(slots)} slot games\n")
-        
+
         for game in slots[:10]:
             rtp_str = f"RTP: {game.rtp}%" if game.rtp else "RTP: N/A"
             print(f"  {game.name} ({game.provider}) — {rtp_str}")
@@ -80,7 +80,7 @@ from stakeapi import StakeAPI
 async def main():
     async with StakeAPI(access_token="your_token") as client:
         events = await client.get_sports_events(sport="football")
-        
+
         for event in events[:10]:
             status = "🔴 LIVE" if event.live else "⏳ Upcoming"
             print(f"  {event.home_team} vs {event.away_team} [{status}]")
@@ -126,7 +126,7 @@ async def main():
             client.get_sports_events(),
             client.get_bet_history(limit=20),
         )
-        
+
         print(f"Balance currencies: {len(balance['available'])}")
         print(f"Casino games: {len(games)}")
         print(f"Sports events: {len(events)}")
@@ -145,14 +145,14 @@ from stakeapi import StakeAPI
 async def main():
     async with StakeAPI(access_token="your_token") as client:
         games = await client.get_casino_games()
-        
+
         providers = Counter(g.provider for g in games)
         categories = Counter(g.category for g in games)
-        
+
         print("Top Providers:")
         for provider, count in providers.most_common(10):
             print(f"  {provider}: {count} games")
-        
+
         print("\nCategories:")
         for category, count in categories.most_common():
             print(f"  {category}: {count} games")
@@ -170,17 +170,17 @@ from stakeapi import StakeAPI
 async def main():
     async with StakeAPI(access_token="your_token") as client:
         bets = await client.get_bet_history(limit=100)
-        
+
         if not bets:
             print("No bets found")
             return
-        
+
         won = [b for b in bets if b.status == "won"]
         lost = [b for b in bets if b.status == "lost"]
-        
+
         total_wagered = sum(float(b.amount) for b in bets)
         total_won = sum(float(b.potential_payout) for b in won)
-        
+
         print("PERFORMANCE REPORT")
         print("=" * 40)
         print(f"Total Bets:     {len(bets)}")
@@ -203,29 +203,29 @@ from stakeapi import StakeAPI
 
 async def monitor(token: str, check_interval: int = 30):
     prev = {}
-    
+
     while True:
         try:
             async with StakeAPI(access_token=token) as client:
                 balance = await client.get_user_balance()
                 now = datetime.now().strftime("%H:%M:%S")
-                
+
                 for cur, amt in balance["available"].items():
                     if amt <= 0:
                         continue
-                    
+
                     old = prev.get(cur, amt)
                     diff = amt - old
-                    
+
                     if diff > 0:
                         print(f"[{now}] 📈 {cur.upper()}: +{diff:.8f}")
                     elif diff < 0:
                         print(f"[{now}] 📉 {cur.upper()}: {diff:.8f}")
-                
+
                 prev = {k: v for k, v in balance["available"].items() if v > 0}
         except Exception as e:
             print(f"Error: {e}")
-        
+
         await asyncio.sleep(check_interval)
 
 asyncio.run(monitor("your_token"))
@@ -241,18 +241,18 @@ from stakeapi import StakeAPI
 async def export_bets():
     async with StakeAPI(access_token="your_token") as client:
         bets = await client.get_bet_history(limit=100)
-        
+
         with open("bets.csv", "w", newline="") as f:
             w = csv.writer(f)
             w.writerow(["ID", "Type", "Amount", "Payout", "Status", "Date"])
-            
+
             for b in bets:
                 w.writerow([
                     b.id, b.bet_type, float(b.amount),
                     float(b.potential_payout), b.status,
                     b.placed_at.isoformat()
                 ])
-        
+
         print(f"Exported {len(bets)} bets to bets.csv")
 
 asyncio.run(export_bets())
@@ -280,7 +280,7 @@ async def main():
           }
         }
         """
-        
+
         data = await client._graphql_request(query=query)
         print(data)
 
