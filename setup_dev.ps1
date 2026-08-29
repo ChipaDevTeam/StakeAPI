@@ -15,8 +15,9 @@ try {
 
 # Check Python version
 $versionNumber = python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
-$requiredVersion = 3.8
-if ([decimal]$versionNumber -lt $requiredVersion) {
+$requiredVersion = [version]"3.8"
+$currentVersion = [version]$versionNumber
+if ($currentVersion -lt $requiredVersion) {
     Write-Host "Error: Python $versionNumber found, but Python $requiredVersion or later is required" -ForegroundColor Red
     exit 1
 }
