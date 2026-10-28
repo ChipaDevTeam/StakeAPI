@@ -17,222 +17,117 @@ Connect to Stake.com's real-time data streams for live updates and instant notif
 
 ## Overview
 
-WebSockets provide real-time, bidirectional communication with Stake.com. Use them for live game updates, bet results, balance changes, and chat messages — all pushed to you instantly without polling.
+Stake pushes live data over a GraphQL WebSocket at `wss://<domain>/_api/websockets`, using the standard [graphql-ws](https://github.com/enisdenjo/graphql-ws) protocol (`graphql-transport-ws`). `StakeWebSocket` handles the connection, keep-alive pings, and running many subscriptions over one socket.
 
-## Why WebSockets?
+Most feeds are public, so no login is needed. The connection still has to pass Cloudflare, so give the client the same cookies you use for normal requests.
 
-| Approach | Latency | Efficiency | Use Case |
-|:---------|:--------|:-----------|:---------|
-| REST Polling | High (1-60s) | Low | Infrequent checks |
-| GraphQL Polling | Medium (1-30s) | Medium | Periodic updates |
-| **WebSocket** | **Instant** (<100ms) | **High** | Live data, real-time apps |
-
-## Basic WebSocket Connection
+## Quick start
 
 ```python
 import asyncio
-import websockets
-import json
-
-async def connect_to_stake():
-    uri = "wss://stake.com/_api/websocket"
-    
-    headers = {
-        "x-access-token": "your_token_here",
-        "Origin": "https://stake.com",
-    }
-    
-    async with websockets.connect(uri, extra_headers=headers) as ws:
-        print("✅ Connected to Stake.com WebSocket")
-        
-        # Subscribe to balance updates
-        subscribe_msg = {
-            "type": "subscribe",
-            "channel": "user:balances"
-        }
-        await ws.send(json.dumps(subscribe_msg))
-        
-        # Listen for messages
-        async for message in ws:
-            data = json.loads(message)
-            print(f"📩 Received: {data}")
-
-asyncio.run(connect_to_stake())
-```
-
-## Subscribing to Channels
-
-### Balance Updates
-
-Get notified whenever your balance changes:
-
-```python
-async def watch_balance(ws):
-    await ws.send(json.dumps({
-        "type": "subscribe",
-        "channel": "user:balances"
-    }))
-    
-    async for message in ws:
-        data = json.loads(message)
-        if data.get("channel") == "user:balances":
-            print(f"💰 Balance update: {data['payload']}")
-```
-
-### Live Game Results
-
-Watch game results in real-time:
-
-```python
-async def watch_game_results(ws, game_slug: str):
-    await ws.send(json.dumps({
-        "type": "subscribe",
-        "channel": f"game:{game_slug}"
-    }))
-    
-    async for message in ws:
-        data = json.loads(message)
-        print(f"🎰 Game result: {data}")
-```
-
-### Sports Live Updates
-
-Track live sports events:
-
-```python
-async def watch_live_sports(ws, event_id: str):
-    await ws.send(json.dumps({
-        "type": "subscribe",
-        "channel": f"sports:event:{event_id}"
-    }))
-    
-    async for message in ws:
-        data = json.loads(message)
-        print(f"⚽ Score update: {data}")
-```
-
-## Robust WebSocket Client
-
-A production-ready WebSocket client with reconnection:
-
-```python
-import asyncio
-import websockets
-import json
-import logging
-
-logger = logging.getLogger("stake_ws")
-
-class StakeWebSocket:
-    def __init__(self, access_token: str):
-        self.access_token = access_token
-        self.uri = "wss://stake.com/_api/websocket"
-        self.ws = None
-        self.subscriptions = []
-        self.reconnect_delay = 1
-        self.max_reconnect_delay = 60
-    
-    async def connect(self):
-        while True:
-            try:
-                headers = {
-                    "x-access-token": self.access_token,
-                    "Origin": "https://stake.com",
-                }
-                
-                async with websockets.connect(
-                    self.uri, 
-                    extra_headers=headers,
-                    ping_interval=30,
-                    ping_timeout=10
-                ) as ws:
-                    self.ws = ws
-                    self.reconnect_delay = 1  # Reset on successful connect
-                    logger.info("Connected to Stake.com WebSocket")
-                    
-                    # Re-subscribe to channels
-                    for channel in self.subscriptions:
-                        await self._subscribe(channel)
-                    
-                    await self._listen()
-                    
-            except websockets.exceptions.ConnectionClosed:
-                logger.warning("WebSocket connection closed")
-            except Exception as e:
-                logger.error(f"WebSocket error: {e}")
-            
-            # Exponential backoff
-            logger.info(f"Reconnecting in {self.reconnect_delay}s...")
-            await asyncio.sleep(self.reconnect_delay)
-            self.reconnect_delay = min(
-                self.reconnect_delay * 2, 
-                self.max_reconnect_delay
-            )
-    
-    async def _subscribe(self, channel: str):
-        if self.ws:
-            await self.ws.send(json.dumps({
-                "type": "subscribe",
-                "channel": channel
-            }))
-            logger.info(f"Subscribed to {channel}")
-    
-    async def subscribe(self, channel: str):
-        if channel not in self.subscriptions:
-            self.subscriptions.append(channel)
-        await self._subscribe(channel)
-    
-    async def _listen(self):
-        async for message in self.ws:
-            data = json.loads(message)
-            await self.on_message(data)
-    
-    async def on_message(self, data: dict):
-        """Override this method to handle messages."""
-        print(f"Message: {data}")
-
-# Usage:
-class MyHandler(StakeWebSocket):
-    async def on_message(self, data):
-        channel = data.get("channel", "")
-        
-        if "balances" in channel:
-            print(f"💰 Balance changed: {data['payload']}")
-        elif "game:" in channel:
-            print(f"🎰 Game update: {data['payload']}")
-        else:
-            print(f"📩 {data}")
+from stakeapi import StakeAPI
 
 async def main():
-    handler = MyHandler(access_token="your_token")
-    await handler.subscribe("user:balances")
-    await handler.connect()
+    async with StakeAPI(base_url="https://stake1017.com", cookie_file="cookie.txt") as client:
+        async with client.websocket() as ws:
+            async for tick in ws.crash_multiplier():
+                print(f"{tick['multiplier']:.2f}x")
 
 asyncio.run(main())
 ```
 
-## Combining WebSocket with REST API
+`client.websocket()` reuses the client's `base_url`, cookies, User-Agent and access token. Each stream is an async iterator. Leaving the `async for` loop (with `break`, `return` or an exception) unsubscribes on the server.
+
+## Available streams
+
+| Method | Yields | Login |
+|:-------|:-------|:------|
+| `crash()` | Crash round state (`__typename == "MultiplayerCrash"`) and player bets/cashouts (`"MultiplayerCrashBet"`) | No |
+| `crash_multiplier()` | `{"id", "elapsed", "multiplier"}` ticks for the running round | No |
+| `slide()` | Slide round (`"MultiplayerSlide"`) and bet (`"MultiplayerSlideBet"`) events | No |
+| `all_house_bets()` | Every public casino bet as it settles | No |
+| `highroller_bets()` | High-roller casino bets | No |
+| `all_sport_bets()` | Public sports bets as they are placed | No |
+| `sport_market(market_id, provider)` | A market with its outcomes each time the odds change | No |
+| `sport_fixture(fixture_id, provider)` | A fixture each time its status or score changes | No |
+| `race_status()` | Race start/end/status changes | No |
+| `race_leaderboard(race_id, limit=10)` | Leaderboard updates for one race | No |
+| `chat_messages(chat_id)` | Messages in a public chat room | No |
+| `session_expired()` | Fires when your session expires | Yes |
+
+Streams that need a login raise `PermissionDeniedError`. A rejected subscription raises `GraphQLError`, and a dropped connection raises `NetworkError` in every open stream.
+
+## Several streams at once
+
+One connection can carry any number of subscriptions. Run each one in its own task:
 
 ```python
-async def live_balance_tracker():
-    """Combine REST for initial state and WebSocket for live updates."""
-    
-    async with StakeAPI(access_token="your_token") as client:
-        # Get initial balance via REST
-        balance = await client.get_user_balance()
-        print("Initial balance:", balance)
-    
-    # Then switch to WebSocket for live updates
-    ws_client = StakeWebSocket(access_token="your_token")
-    await ws_client.subscribe("user:balances")
-    await ws_client.connect()
+async def watch_crash(ws):
+    async for event in ws.crash():
+        # Round statuses: pending, starting, start, in_progress, crash
+        if event["__typename"] == "MultiplayerCrash" and event["status"] == "crash":
+            print(f"Crashed at {event['multiplier']:.2f}x")
+
+async def watch_highrollers(ws):
+    async for bet in ws.highroller_bets():
+        inner = bet["bet"]
+        print(f"{bet['game']['name']}: {inner['amount']} {inner['currency']}")
+
+async with client.websocket() as ws:
+    await asyncio.gather(watch_crash(ws), watch_highrollers(ws))
 ```
 
-{% include affiliate-banner.html %}
-{% include discord-cta.html %}
-{% include chipaeditor-cta.html %}
+## Live odds for a match
 
----
+Take the market id and provider from any fixture returned by the sports methods:
 
-{: .note }
-> Real-time data makes all the difference. [Sign up on Stake.com](https://stake.com/?c=WY7953wQ) and build live dashboards with WebSocket support.
+```python
+fixtures = (await client.get_fixtures(search_type="live", limit=1))["fixtures"]
+fixture = fixtures[0]
+market = fixture["groups"][0]["templates"][0]["markets"][0]
+
+async with client.websocket() as ws:
+    async for update in ws.sport_market(market["id"], fixture["provider"]):
+        odds = {o["name"]: o["odds"] for o in update["outcomes"]}
+        print(update["status"], odds)
+```
+
+## Chat
+
+```python
+chats = await client.get_public_chats()           # [{"id", "name": "en", ...}, ...]
+english = next(c for c in chats if c["name"] == "en")
+
+async with client.websocket() as ws:
+    async for message in ws.chat_messages(english["id"]):
+        text = message["data"].get("message")
+        if text:
+            print(f"{message['user']['name']}: {text}")
+```
+
+## Custom subscriptions
+
+`subscribe()` runs any GraphQL subscription and yields its `data` payloads:
+
+```python
+query = "subscription CrashMultiplier { crashMultiplier { multiplier } }"
+async for data in ws.subscribe(query):
+    print(data["crashMultiplier"]["multiplier"])
+```
+
+## Reconnecting
+
+`StakeWebSocket` does not reconnect by itself. Wrap your loop to reconnect after a `NetworkError`:
+
+```python
+from stakeapi.exceptions import NetworkError
+
+while True:
+    try:
+        async with client.websocket() as ws:
+            async for tick in ws.crash_multiplier():
+                print(tick["multiplier"])
+    except NetworkError as e:
+        print(f"Disconnected ({e}), retrying in 5s")
+        await asyncio.sleep(5)
+```

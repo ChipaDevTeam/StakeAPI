@@ -18,6 +18,7 @@ from .exceptions import (
 from .models import User, Game, SportEvent, Bet
 from .endpoints import Endpoints, GraphQLQueries
 from .auth import AuthManager
+from .websocket import StakeWebSocket
 
 
 def _parse_datetime(value):
@@ -231,8 +232,8 @@ class StakeAPI:
         """Async context manager exit."""
         await self.close()
         
-    async def _create_session(self):
-        """Create aiohttp session with proper headers."""
+    def _session_headers(self):
+        """Build the default headers and cookies sent with every request."""
         ua = self.user_agent or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
         headers = {
             "User-Agent": ua,
@@ -255,22 +256,38 @@ class StakeAPI:
         # Set up cookies. When a full cookie string was provided (cookie_file /
         # cookie_string), send it verbatim as the Cookie header — the cookie
         # jar would mangle values containing commas or quotes (e.g. session_info).
-        cookies = None
+        cookies = {}
         if self._cookie_header:
             headers["Cookie"] = self._cookie_header
         else:
-            cookies = {}
             if self.session_cookie:
                 cookies["session"] = self.session_cookie
             if self.cf_clearance:
                 cookies["cf_clearance"] = self.cf_clearance
+        return headers, cookies
 
+    async def _create_session(self):
+        """Create aiohttp session with proper headers."""
+        headers, cookies = self._session_headers()
         timeout = aiohttp.ClientTimeout(total=self.timeout)
         self._session = aiohttp.ClientSession(
             headers=headers,
             timeout=timeout,
             cookies=cookies or None,
         )
+
+    def websocket(self, language: str = "en") -> StakeWebSocket:
+        """
+        Create a WebSocket client for live data (crash, bet feeds, odds, chat).
+
+        It reuses this client's base_url, cookies and access token. Use it as
+        an async context manager:
+
+            async with client.websocket() as ws:
+                async for bet in ws.highroller_bets():
+                    print(bet)
+        """
+        return StakeWebSocket(self, language=language)
         
     async def close(self):
         """Close the session."""
@@ -1066,3 +1083,10 @@ class StakeAPI:
             operation_name="ActiveRaces",
         )
         return data.get("activeRaces") or []
+
+    async def get_public_chats(self) -> List[Dict[str, Any]]:
+        """List public chat rooms (id, name, isPublic), e.g. for StakeWebSocket.chat_messages."""
+        data = await self._graphql_request(
+            GraphQLQueries.PUBLIC_CHATS, operation_name="PublicChats"
+        )
+        return data.get("publicChats") or []

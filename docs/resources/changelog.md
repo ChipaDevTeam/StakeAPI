@@ -27,6 +27,8 @@ This project follows [Semantic Versioning](https://semver.org/).
 - **Public sports data**: `get_sports_events()` now works, plus `get_sport_index()`, `get_sports()`, `get_trending_sports()`, `get_fixtures()`, `get_sport_fixtures()`, `get_tournament()`, `search_sports()`, `get_trending_matches()`, `get_top_picks()` and `get_top_multis()`
 - **Promotions and info**: `get_challenges()`, `get_active_races()` and `get_currency_limits()`
 - `Game` model: new `slug` and `player_count` fields
+- **Live data over WebSocket**: `StakeWebSocket` (via `client.websocket()`) with streams for Crash, Slide, casino and sports bet feeds, live odds and scores, races, chat and session expiry, plus `subscribe()` for any subscription
+- `get_public_chats()` lists public chat rooms
 
 ---
 

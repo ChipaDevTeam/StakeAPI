@@ -17,6 +17,7 @@ Example usage:
 """
 
 from .client import StakeAPI
+from .websocket import StakeWebSocket
 from .exceptions import (
     StakeAPIError,
     AuthenticationError,
@@ -31,6 +32,7 @@ from ._version import __version__
 
 __all__ = [
     "StakeAPI",
+    "StakeWebSocket",
     "AuthManager",
     "StakeAPIError",
     "AuthenticationError",

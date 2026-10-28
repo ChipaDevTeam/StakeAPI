@@ -1015,3 +1015,254 @@ class GraphQLQueries:
     HIGHROLLER_HOUSE_BETS = ALL_HOUSE_BETS.replace(
         "query AllHouseBets", "query HighrollerHouseBets"
     ).replace("allHouseBets(limit", "highrollerHouseBets(limit")
+
+
+    PUBLIC_CHATS = """
+    query PublicChats {
+      publicChats {
+        id
+        name
+        isPublic
+      }
+    }
+    """
+
+class GraphQLSubscriptions:
+    """GraphQL subscriptions for the /_api/websockets endpoint.
+
+    Trimmed versions of the site's own subscriptions of the same name,
+    validated against the live API.
+    """
+
+    CRASH = """
+    subscription Crash {
+      crash {
+        event {
+          __typename
+          ... on MultiplayerCrash {
+            id
+            status
+            multiplier
+            startTime
+            nextRoundIn
+            crashpoint
+            elapsed
+            timestamp
+          }
+          ... on MultiplayerCrashBet {
+            id
+            user {
+              id
+              name
+            }
+            payoutMultiplier
+            gameId
+            amount
+            payout
+            currency
+            result
+            cashoutAt
+          }
+        }
+      }
+    }
+    """
+
+    CRASH_MULTIPLIER = """
+    subscription CrashMultiplier {
+      crashMultiplier {
+        id
+        elapsed
+        multiplier
+      }
+    }
+    """
+
+    SLIDE = """
+    subscription slide {
+      slide {
+        event {
+          __typename
+          ... on MultiplayerSlide {
+            id
+            status
+            multiplier
+            startTime
+            nextRoundIn
+            elapsed
+            timestamp
+            numbers
+          }
+          ... on MultiplayerSlideBet {
+            id
+            user {
+              id
+              name
+            }
+            payoutMultiplier
+            gameId
+            amount
+            payout
+            currency
+            result
+            cashoutAt
+          }
+        }
+      }
+    }
+    """
+
+    ALL_HOUSE_BETS = GraphQLQueries.ALL_HOUSE_BETS.replace(
+        "query AllHouseBets($limit: Int = 10)", "subscription AllHouseBetsSubscription"
+    ).replace("allHouseBets(limit: $limit)", "allHouseBets")
+
+    HIGHROLLER_HOUSE_BETS = GraphQLQueries.ALL_HOUSE_BETS.replace(
+        "query AllHouseBets($limit: Int = 10)", "subscription HighrollerHouseBetsSubscription"
+    ).replace("allHouseBets(limit: $limit)", "highrollerHouseBets")
+
+    ALL_SPORT_BETS = """
+    subscription BetsBoard_AllSportBets {
+      allSportBets {
+        id
+        iid
+        bet {
+          __typename
+          ... on SportBet {
+            id
+            amount
+            currency
+            potentialMultiplier
+            createdAt
+            user {
+              name
+            }
+            outcomes {
+              id
+              odds
+              fixtureName
+              fixture {
+                id
+              }
+            }
+          }
+        }
+      }
+    }
+    """
+
+    SPORT_MARKET = """
+    subscription SportMarketSubscription($marketId: String!, $provider: SportsbookOddsProviderEnum!) {
+      sportMarket(marketId: $marketId, provider: $provider) {
+        id
+        name
+        status
+        extId
+        specifiers
+        outcomes {
+          id
+          name
+          odds
+          active
+          probabilities
+        }
+        fixture {
+          id
+          status
+        }
+      }
+    }
+    """
+
+    SPORT_FIXTURE = """
+    subscription SportFixtureDataMatch_SportFixture($fixtureId: String!, $provider: SportsbookOddsProviderEnum!) {
+      sportFixture(fixtureId: $fixtureId, provider: $provider) {
+        ...LibFixture
+      }
+    }
+    """ + _FIXTURE_FRAGMENT
+
+    RACE_STATUS = """
+    subscription RaceStatus {
+      raceStatus {
+        id
+        name
+        currency
+        type
+        startTime
+        endTime
+        status
+        scope
+      }
+    }
+    """
+
+    RACE_LEADERBOARD = """
+    subscription RaceLeaderboardSubscription($raceId: String!, $limit: Int = 10) {
+      race(raceId: $raceId) {
+        id
+        leaderboard(limit: $limit) {
+          position
+          user {
+            id
+            name
+          }
+          wageredAmount
+          payoutAmount
+          percentage
+          currency
+        }
+      }
+    }
+    """
+
+    CHAT_MESSAGES = """
+    subscription ChatMessages($chatId: String!) {
+      chatMessages(chatId: $chatId) {
+        id
+        createdAt
+        user {
+          id
+          name
+        }
+        data {
+          __typename
+          ... on ChatMessageDataText {
+            message
+          }
+          ... on ChatMessageDataBot {
+            message
+          }
+          ... on ChatMessageDataTip {
+            tip {
+              amount
+              currency
+              sendBy {
+                name
+              }
+              user {
+                name
+              }
+            }
+          }
+          ... on ChatMessageDataRain {
+            rain {
+              amount
+              currency
+              user {
+                name
+              }
+            }
+          }
+        }
+      }
+    }
+    """
+
+    SESSION_EXPIRED = """
+    subscription SessionExpiredSubscription {
+      sessionExpired {
+        expireAt
+        type
+      }
+    }
+    """

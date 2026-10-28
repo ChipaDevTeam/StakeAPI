@@ -20,6 +20,7 @@ This is an unofficial API wrapper and is not affiliated with, endorsed by, or co
 - 📊 Statistics and analytics
 - 🔐 Secure authentication handling
 - ⚡ Async support for high performance
+- 📡 Live data over WebSocket (Crash, bet feeds, live odds, chat)
 
 ## Installation
 
