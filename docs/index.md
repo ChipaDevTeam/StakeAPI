@@ -58,7 +58,7 @@ async def main():
             print(f"{game.name} by {game.provider} — RTP: {game.rtp}%")
 
         # Check sports events
-        events = await client.get_sports_events(sport="football")
+        events = await client.get_sports_events(sport="soccer")
         for event in events[:3]:
             print(f"{event.home_team} vs {event.away_team}")
 

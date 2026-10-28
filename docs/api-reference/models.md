@@ -200,7 +200,7 @@ print(f"Home win odds: {event.odds.get('home', 'N/A')}")
 
 ```python
 async with StakeAPI(access_token="...", cf_clearance="...") as client:
-    events = await client.get_sports_events(sport="football")
+    events = await client.get_sports_events(sport="soccer")
     live_events = [e for e in events if e.live]
     print(f"Live matches: {len(live_events)}")
     for event in live_events:

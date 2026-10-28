@@ -28,6 +28,7 @@ class Game(BaseModel):
     
     id: str
     name: str
+    slug: Optional[str] = None
     category: str
     provider: str
     description: Optional[str] = None
@@ -37,6 +38,7 @@ class Game(BaseModel):
     volatility: Optional[str] = None
     features: List[str] = Field(default_factory=list)
     thumbnail_url: Optional[str] = None
+    player_count: Optional[int] = None
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Game":

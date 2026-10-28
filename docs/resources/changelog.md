@@ -19,6 +19,17 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Public casino data**: `get_casino_games()` and `get_game_details()` now work (lobby groups and game slugs), plus `search_casino_games()`, `get_casino_collection()`, `get_game_payouts()`, `get_crash_history()`, `get_crash_game()`, `get_slide_history()` and `get_highroller_bets()`
+- **Public sports data**: `get_sports_events()` now works, plus `get_sport_index()`, `get_sports()`, `get_trending_sports()`, `get_fixtures()`, `get_sport_fixtures()`, `get_tournament()`, `search_sports()`, `get_trending_matches()`, `get_top_picks()` and `get_top_multis()`
+- **Promotions and info**: `get_challenges()`, `get_active_races()` and `get_currency_limits()`
+- `Game` model: new `slug` and `player_count` fields
+
+---
+
 ## [0.1.0] — 2026-03-31
 
 ### 🎉 Initial Release

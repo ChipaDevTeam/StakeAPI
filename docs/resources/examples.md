@@ -79,7 +79,7 @@ from stakeapi import StakeAPI
 
 async def main():
     async with StakeAPI(access_token="your_token") as client:
-        events = await client.get_sports_events(sport="football")
+        events = await client.get_sports_events(sport="soccer")
         
         for event in events[:10]:
             status = "🔴 LIVE" if event.live else "⏳ Upcoming"

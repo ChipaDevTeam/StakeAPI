@@ -106,6 +106,33 @@ def _event_from_fixture(
         return None
 
 
+def _game_from_kurator(game: Dict[str, Any]) -> Optional[Game]:
+    """Map a GameKuratorGame (lobby, search or detail query) to a Game model."""
+    if not game.get("id"):
+        return None
+    groups = [g.get("group") or {} for g in game.get("groupGames") or []]
+    categories = [g.get("translation") for g in groups if g.get("type") == "category"]
+    provider = (game.get("providerGroup") or {}).get("name") or next(
+        (g.get("translation") for g in groups if g.get("type") == "provider"), ""
+    )
+    edge = game.get("edge")
+    try:
+        return Game(
+            id=game["id"],
+            name=game.get("name", ""),
+            slug=game.get("slug"),
+            category=categories[0] if categories else (game.get("type") or ""),
+            provider=provider or "",
+            description=game.get("description"),
+            rtp=round((1 - edge) * 100, 4) if edge is not None else None,
+            features=[g.get("translation") for g in groups if g.get("translation")],
+            thumbnail_url=game.get("thumbnailUrl"),
+            player_count=game.get("playerCount"),
+        )
+    except Exception:
+        return None
+
+
 class StakeAPI:
     """Main client for interacting with stake.com API."""
     
@@ -428,32 +455,135 @@ class StakeAPI:
         return data
             
     # Casino Methods
-    async def get_casino_games(self, category: Optional[str] = None) -> List[Game]:
+    async def get_casino_games(
+        self,
+        category: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+        sort: str = "popular7d",
+    ) -> List[Game]:
         """
-        Get available casino games.
+        Get casino games in a lobby group.
 
-        Raises:
-            StakeAPIError: Always — stake has no REST API and the GraphQL
-                query for game lists has not been mapped yet.
+        Args:
+            category: Group slug as used in site URLs (/casino/group/<slug>),
+                e.g. "slots", "stake-originals", "live-casino". Defaults to "slots".
+            limit: Maximum number of games to return
+            offset: Number of games to skip (for pagination)
+            sort: GameKuratorGroupGameSortEnum value, e.g. "popular7d"
         """
-        raise StakeAPIError(
-            "get_casino_games is not supported yet: stake.com has no REST API "
-            "and the GraphQL query for game lists has not been mapped. "
-            "Working methods: get_user_balance, get_user_profile, get_bet_history, get_all_house_bets, get_currency_rates, get_sport_index, get_sports_events."
+        data = await self._graphql_request(
+            GraphQLQueries.CASINO_GROUP,
+            variables={
+                "slug": category or "slots",
+                "limit": limit,
+                "offset": offset,
+                "sort": sort,
+            },
+            operation_name="SlugKuratorGroup",
         )
+        group = data.get("slugKuratorGroup")
+        if not group:
+            raise StakeAPIError(f"Unknown casino group {category!r}")
+        games = (_game_from_kurator(g.get("game") or {}) for g in group.get("groupGamesList") or [])
+        return [g for g in games if g]
 
     async def get_game_details(self, game_id: str) -> Game:
         """
         Get details for a specific game.
 
-        Raises:
-            StakeAPIError: Always — see get_casino_games.
+        Args:
+            game_id: Game slug as used in site URLs (/casino/games/<slug>),
+                e.g. "stake-dice"
         """
-        raise StakeAPIError(
-            "get_game_details is not supported yet: stake.com has no REST API "
-            "and the GraphQL query for game details has not been mapped. "
-            "Working methods: get_user_balance, get_user_profile, get_bet_history, get_all_house_bets, get_currency_rates, get_sport_index, get_sports_events."
+        data = await self._graphql_request(
+            GraphQLQueries.CASINO_GAME,
+            variables={"slug": game_id},
+            operation_name="SlugKuratorGame",
         )
+        game = _game_from_kurator(data.get("slugKuratorGame") or {})
+        if not game:
+            raise StakeAPIError(f"Unknown game {game_id!r}")
+        return game
+
+    async def search_casino_games(self, query: str, limit: int = 20, offset: int = 0) -> List[Game]:
+        """Search casino games by name."""
+        data = await self._graphql_request(
+            GraphQLQueries.SEARCH_CASINO,
+            variables={"query": query, "limit": limit, "offset": offset},
+            operation_name="searchQueryCasino",
+        )
+        games = (_game_from_kurator(g) for g in data.get("kuratorGameQuery") or [])
+        return [g for g in games if g]
+
+    async def get_casino_collection(
+        self, collection_type: str = "provider", sort: str = "popular", filter: str = "all"
+    ) -> List[Dict[str, Any]]:
+        """
+        Get a casino lobby collection, e.g. the list of game providers.
+
+        Args:
+            collection_type: GameKuratorCollectionEnum value, e.g. "provider"
+            sort: GameKuratorCollectionSortEnum value, e.g. "popular"
+            filter: GameKuratorCollectionFilterEnum value, e.g. "all"
+
+        Returns:
+            Groups with id, slug, translation, gameCount and playerCount.
+        """
+        data = await self._graphql_request(
+            GraphQLQueries.CASINO_COLLECTION,
+            variables={"type": collection_type, "sort": sort, "filter": filter},
+            operation_name="KuratorCollection",
+        )
+        return [c["group"] for c in data.get("kuratorCollection") or [] if c.get("group")]
+
+    async def get_game_payouts(self) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        Get payout tables for Keno, Plinko and Wheel.
+
+        Returns:
+            {"keno": [...], "plinko": [...], "wheel": [...]}, each entry with
+            "payouts" and "risk" (plus "rows" for Plinko and Wheel).
+        """
+        data = await self._graphql_request(
+            GraphQLQueries.GAME_PAYOUTS, operation_name="GamePayouts"
+        )
+        info = data.get("info") or {}
+        return {
+            "keno": info.get("kenoPayouts") or [],
+            "plinko": info.get("plinkoPayouts") or [],
+            "wheel": info.get("wheelPayouts") or [],
+        }
+
+    async def get_crash_history(self, limit: int = 20, offset: int = 0) -> List[Dict[str, Any]]:
+        """Get recent Crash rounds (id, startTime, crashpoint, hash)."""
+        data = await self._graphql_request(
+            GraphQLQueries.CRASH_HISTORY,
+            variables={"limit": limit, "offset": offset},
+            operation_name="CrashGameListHistory",
+        )
+        return data.get("crashGameList") or []
+
+    async def get_crash_game(self, game_id: str) -> Dict[str, Any]:
+        """Get one Crash round with its seed, hash and bet leaderboard."""
+        data = await self._graphql_request(
+            GraphQLQueries.CRASH_GAME,
+            variables={"gameId": game_id},
+            operation_name="CrashGameLookup",
+        )
+        game = data.get("crashGame")
+        if not game:
+            raise StakeAPIError(f"Unknown crash game {game_id!r}")
+        return game
+
+    async def get_slide_history(self, limit: int = 20, offset: int = 0) -> List[Dict[str, Any]]:
+        """Get recent Slide rounds (id, multiplier, startTime, hash)."""
+        data = await self._graphql_request(
+            GraphQLQueries.SLIDE_HISTORY,
+            variables={"limit": limit, "offset": offset},
+            operation_name="SlideGameListHistory",
+        )
+        return data.get("slideGameList") or []
 
     # Sports Methods
     async def get_sport_index(
@@ -507,6 +637,200 @@ class StakeAPI:
                 if event:
                     events.append(event)
         return events
+
+    async def get_sports(
+        self, search_type: str = "upcoming", sport_type: str = "sport", limit: int = 100
+    ) -> List[Dict[str, Any]]:
+        """
+        List sports with their fixture counts.
+
+        Args:
+            search_type: SportSearchEnum value: "upcoming", "live" or "active"
+            sport_type: "sport" or "esport"
+            limit: Maximum number of sports to return
+        """
+        data = await self._graphql_request(
+            GraphQLQueries.SPORT_LIST,
+            variables={"type": search_type, "sportType": sport_type, "limit": limit},
+            operation_name="SportListMenu",
+        )
+        return data.get("sportList") or []
+
+    async def get_trending_sports(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """List the most popular sports (id, name, slug, sportType)."""
+        data = await self._graphql_request(
+            GraphQLQueries.TRENDING_SPORTS,
+            variables={"limit": limit},
+            operation_name="TrendingSportsQ",
+        )
+        return data.get("topSportList") or []
+
+    async def get_fixtures(
+        self,
+        search_type: str = "upcoming",
+        sport_type: str = "sport",
+        group: str = "winner",
+        limit: int = 20,
+        offset: int = 0,
+        market_limit: int = 1,
+    ) -> Dict[str, Any]:
+        """
+        List fixtures across all sports with odds for one market group.
+
+        Args:
+            search_type: SportSearchEnum value: "upcoming", "live" or "active"
+            sport_type: "sport" or "esport"
+            group: Market group to include odds for, e.g. "winner" or "main"
+            limit: Maximum number of fixtures to return
+            offset: Number of fixtures to skip (for pagination)
+            market_limit: Maximum markets returned per template
+
+        Returns:
+            {"count": total matching fixtures, "fixtures": [...]}
+        """
+        data = await self._graphql_request(
+            GraphQLQueries.FIXTURE_LIST,
+            variables={
+                "type": search_type,
+                "sportType": sport_type,
+                "groups": group,
+                "limit": limit,
+                "offset": offset,
+                "marketLimit": market_limit,
+            },
+            operation_name="FixtureList",
+        )
+        return {
+            "count": data.get("fixtureCount", 0),
+            "fixtures": data.get("fixtureList") or [],
+        }
+
+    async def get_sport_fixtures(
+        self,
+        sport: str,
+        search_type: str = "upcoming",
+        group: str = "winner",
+        tournament_limit: int = 25,
+        tournament_offset: int = 0,
+        fixture_limit: int = 20,
+        market_limit: int = 1,
+    ) -> List[Dict[str, Any]]:
+        """
+        List a sport's tournaments, each with its fixtures and odds.
+
+        Args:
+            sport: Sport slug, e.g. "soccer"
+            search_type: SportSearchEnum value: "upcoming", "live" or "active"
+            group: Market group to include odds for, e.g. "winner"
+        """
+        data = await self._graphql_request(
+            GraphQLQueries.SPORT_TOURNAMENT_FIXTURES,
+            variables={
+                "sport": sport,
+                "type": search_type,
+                "groups": group,
+                "tournamentLimit": tournament_limit,
+                "tournamentOffset": tournament_offset,
+                "fixtureLimit": fixture_limit,
+                "marketLimit": market_limit,
+            },
+            operation_name="SportTournamentFixtureList",
+        )
+        sport_data = data.get("slugSport")
+        if not sport_data:
+            raise StakeAPIError(f"Unknown sport {sport!r}")
+        return sport_data.get("tournamentList") or []
+
+    async def get_tournament(
+        self,
+        sport: str,
+        category: str,
+        tournament: str,
+        search_type: str = "upcoming",
+        groups: Optional[List[str]] = None,
+        limit: int = 10,
+        offset: int = 0,
+        market_limit: int = 1,
+    ) -> Dict[str, Any]:
+        """
+        Get one tournament and its fixtures, by the slugs in its site URL
+        (/sports/<sport>/<category>/<tournament>).
+
+        Example:
+            await client.get_tournament("soccer", "england", "premier-league")
+        """
+        data = await self._graphql_request(
+            GraphQLQueries.SLUG_TOURNAMENT,
+            variables={
+                "sport": sport,
+                "category": category,
+                "tournament": tournament,
+                "type": search_type,
+                "groups": groups or ["winner"],
+                "limit": limit,
+                "offset": offset,
+                "marketLimit": market_limit,
+            },
+            operation_name="SlugTournament",
+        )
+        result = data.get("slugTournament")
+        if not result:
+            raise StakeAPIError(f"Unknown tournament {sport}/{category}/{tournament}")
+        return result
+
+    async def search_sports(
+        self, query: str, group: str = "winner", limit: int = 20, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """Search sport fixtures by team, player or event name."""
+        data = await self._graphql_request(
+            GraphQLQueries.SEARCH_SPORTS,
+            variables={"query": query, "groups": group, "limit": limit, "offset": offset},
+            operation_name="searchQuerySports",
+        )
+        return [
+            r["fixture"] for r in data.get("sportFixtureQuery") or []
+            if r.get("fixture")
+        ]
+
+    async def get_trending_matches(
+        self,
+        sort_by: str = "totalBetCount",
+        sport_id: Optional[str] = None,
+        groups: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get the matches with the most betting activity.
+
+        Args:
+            sort_by: SportHomepageTrendingOrderByEnum value, e.g.
+                "totalBetCount" or "totalBetValue"
+            sport_id: Restrict to one sport (its id, see get_sports)
+            groups: Market groups to include odds for (default ["winner"])
+        """
+        data = await self._graphql_request(
+            GraphQLQueries.TRENDING_MATCHES,
+            variables={"sortBy": sort_by, "sportId": sport_id, "groups": groups or ["winner"]},
+            operation_name="SportBetTrendingMatches",
+        )
+        return data.get("sportHomepageTrendingMatches") or []
+
+    async def get_top_picks(
+        self, sort_by: str = "totalBetValue", sport_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get the most-backed single outcomes, with bet statistics."""
+        data = await self._graphql_request(
+            GraphQLQueries.TOP_PICKS,
+            variables={"sortBy": sort_by, "sportId": sport_id},
+            operation_name="SportBetTopPicks",
+        )
+        return data.get("sportHomepageTrendingTopPicks") or []
+
+    async def get_top_multis(self) -> List[Dict[str, Any]]:
+        """Get the most popular multi (accumulator) bets and their legs."""
+        data = await self._graphql_request(
+            GraphQLQueries.TOP_MULTIS, operation_name="SportBetTopMultis"
+        )
+        return data.get("sportHomepageTrendingTopMultis") or []
 
     # User Methods
     async def get_user_profile(self) -> User:
@@ -599,7 +923,8 @@ class StakeAPI:
         raise StakeAPIError(
             "place_bet is not supported yet: stake.com has no REST API and the "
             "GraphQL mutations for placing bets have not been mapped. "
-            "Working methods: get_user_balance, get_user_profile, get_bet_history, get_all_house_bets, get_currency_rates, get_sport_index, get_sports_events."
+            "Working methods: get_user_balance, get_user_profile, get_bet_history, get_all_house_bets, get_currency_rates,"
+            " plus the public casino, sports and promotion methods."
         )
 
     async def get_bet_history(self, limit: int = 50, offset: int = 0) -> List[Bet]:
@@ -669,3 +994,75 @@ class StakeAPI:
             "launched_fiat": config.get("launchedFiatCurrencies") or [],
             "display_fiat": config.get("displayFiatCurrencies") or [],
         }
+
+    async def get_highroller_bets(self, limit: int = 10) -> List[Bet]:
+        """
+        Get the public feed of recent high-roller casino bets.
+
+        Args:
+            limit: Maximum number of bets to return
+        """
+        data = await self._graphql_request(
+            GraphQLQueries.HIGHROLLER_HOUSE_BETS,
+            variables={"limit": limit},
+            operation_name="HighrollerHouseBets",
+        )
+        entries = data.get("highrollerHouseBets") or []
+        return [b for b in (_bet_from_entry(e) for e in entries) if b]
+
+    async def get_currency_limits(self) -> Dict[str, Dict[str, Optional[float]]]:
+        """
+        Get per-currency bet limits.
+
+        Returns:
+            {currency: {"bet_max": ..., "bet_max_profit": ...}}
+        """
+        data = await self._graphql_request(
+            GraphQLQueries.CURRENCY_LIMITS, operation_name="CurrencyLimits"
+        )
+
+        def value(field):
+            raw = (field or {}).get("value")
+            return float(raw) if raw is not None else None
+
+        return {
+            c["name"]: {
+                "bet_max": value(c.get("betMax")),
+                "bet_max_profit": value(c.get("betMaxProfit")),
+            }
+            for c in (data.get("info") or {}).get("currencies") or []
+            if c.get("name")
+        }
+
+    # Promotion Methods
+    async def get_challenges(
+        self, limit: int = 20, offset: int = 0, sort: str = "startAt", direction: str = "desc"
+    ) -> Dict[str, Any]:
+        """
+        Get public casino challenges (multiplier targets with a prize).
+
+        Args:
+            sort: ChallengeSort value, e.g. "startAt"
+            direction: "asc" or "desc"
+
+        Returns:
+            {"count": total challenges, "challenges": [...]}
+        """
+        data = await self._graphql_request(
+            GraphQLQueries.CHALLENGES,
+            variables={"limit": limit, "offset": offset, "sort": sort, "direction": direction},
+            operation_name="ChallengePublicList",
+        )
+        return {
+            "count": data.get("challengeUnauthenticatedUserCount", 0),
+            "challenges": data.get("challengeUnauthenticatedUserList") or [],
+        }
+
+    async def get_active_races(self, leaderboard_limit: int = 10) -> List[Dict[str, Any]]:
+        """Get the currently running wager races, each with its top leaderboard."""
+        data = await self._graphql_request(
+            GraphQLQueries.ACTIVE_RACES,
+            variables={"limit": leaderboard_limit},
+            operation_name="ActiveRaces",
+        )
+        return data.get("activeRaces") or []

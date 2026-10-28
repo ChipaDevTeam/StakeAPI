@@ -156,37 +156,38 @@ finally:
 
 ## Casino Methods
 
-### `get_casino_games(category=None)`
+All casino methods read public data, so no login is needed. Requests still have to pass Cloudflare, so pass your browser cookies (for example `cookie_file="cookie.txt"`, which includes `cf_clearance`). Game and group slugs are the ones in site URLs: `/casino/games/<slug>` and `/casino/group/<slug>`.
+
+### `get_casino_games(category=None, limit=50, offset=0, sort="popular7d")`
 
 ```python
 async def get_casino_games(
     self,
-    category: Optional[str] = None
+    category: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+    sort: str = "popular7d",
 ) -> List[Game]
 ```
 
-Fetch the list of casino games available on Stake.com, optionally filtered by category.
-
-**Parameters:**
+Fetch the games in a casino lobby group.
 
 | Parameter | Type | Default | Description |
 |:----------|:-----|:--------|:------------|
-| `category` | `Optional[str]` | `None` | Category slug to filter by, e.g. `"slots"`, `"live"`, `"table"` |
+| `category` | `Optional[str]` | `"slots"` | Group slug, e.g. `"slots"`, `"stake-originals"`, `"live-casino"` |
+| `limit` | `int` | `50` | Maximum games to return |
+| `offset` | `int` | `0` | Games to skip, for pagination |
+| `sort` | `str` | `"popular7d"` | Sort order |
 
-**Returns:** `List[Game]` — Each item is a [`Game`](models.md#class-game) object.
+**Returns:** `List[Game]`. `rtp` is derived from the house edge, and `player_count` is the number of current players.
 
-**Raises:** `StakeAPIError`, `AuthenticationError`
+**Raises:** `StakeAPIError` if the group does not exist.
 
 ```python
-async with StakeAPI(access_token="...", cf_clearance="...") as client:
-    # Get all games
-    all_games = await client.get_casino_games()
-    print(f"Total games: {len(all_games)}")
-
-    # Filter to slots only
-    slots = await client.get_casino_games(category="slots")
-    for game in slots[:5]:
-        print(f"  {game.name} ({game.provider}) — RTP: {game.rtp}%")
+async with StakeAPI(cookie_file="cookie.txt") as client:
+    originals = await client.get_casino_games(category="stake-originals")
+    for game in originals[:5]:
+        print(f"{game.name} ({game.provider}): RTP {game.rtp}%, {game.player_count} playing")
 ```
 
 ---
@@ -197,68 +198,133 @@ async with StakeAPI(access_token="...", cf_clearance="...") as client:
 async def get_game_details(self, game_id: str) -> Game
 ```
 
-Fetch full details for a single casino game by its ID.
+Fetch one game by its slug, e.g. `"stake-dice"` or `"stake-plinko"`.
 
-**Parameters:**
+**Raises:** `StakeAPIError` if the game does not exist.
 
-| Parameter | Type | Description |
-|:----------|:-----|:------------|
-| `game_id` | `str` | The unique game identifier (e.g. `"plinko"`, `"dice"`) |
+---
 
-**Returns:** `Game` — A fully populated [`Game`](models.md#class-game) object.
+### `search_casino_games(query, limit=20, offset=0)`
 
-**Raises:** `GameNotFoundError` if the game ID does not exist, `StakeAPIError` for other errors.
+Search games by name. Returns `List[Game]`.
 
-```python
-async with StakeAPI(access_token="...", cf_clearance="...") as client:
-    game = await client.get_game_details("plinko")
-    print(f"Name: {game.name}")
-    print(f"Provider: {game.provider}")
-    print(f"RTP: {game.rtp}%")
-    print(f"Min bet: {game.min_bet} / Max bet: {game.max_bet}")
-    print(f"Volatility: {game.volatility}")
-    print(f"Features: {', '.join(game.features)}")
-```
+---
+
+### `get_casino_collection(collection_type="provider", sort="popular", filter="all")`
+
+List a lobby collection, such as all game providers. Each item is a dict with `id`, `slug`, `translation`, `gameCount` and `playerCount`.
+
+---
+
+### `get_game_payouts()`
+
+Payout tables for Keno, Plinko and Wheel: `{"keno": [...], "plinko": [...], "wheel": [...]}`. Each entry has `payouts` and `risk`, plus `rows` for Plinko and Wheel.
+
+---
+
+### `get_crash_history(limit=20, offset=0)` / `get_slide_history(limit=20, offset=0)`
+
+Recent rounds of the multiplayer Crash and Slide games, with their result and provably-fair hash.
+
+### `get_crash_game(game_id)`
+
+One Crash round with its revealed seed, hash and bet leaderboard.
+
+---
+
+### `get_highroller_bets(limit=10)`
+
+The public high-roller casino bet feed, as `List[Bet]`.
 
 ---
 
 ## Sports Methods
 
+All sports methods read public data, so no login is needed (Cloudflare cookies are still required, as above). Wherever a `search_type` appears it is `"upcoming"`, `"live"` or `"active"`, and `group` selects which market's odds are included (`"winner"` covers match-winner odds).
+
 ### `get_sports_events(sport=None)`
 
 ```python
-async def get_sports_events(
-    self,
-    sport: Optional[str] = None
-) -> List[SportEvent]
+async def get_sports_events(self, sport: Optional[str] = None) -> List[SportEvent]
 ```
 
-Fetch live and upcoming sports events, optionally filtered by sport.
-
-**Parameters:**
-
-| Parameter | Type | Default | Description |
-|:----------|:-----|:--------|:------------|
-| `sport` | `Optional[str]` | `None` | Sport slug to filter by, e.g. `"football"`, `"basketball"`, `"tennis"` |
-
-**Returns:** `List[SportEvent]` — Each item is a [`SportEvent`](models.md#class-sportevent) object.
-
-**Raises:** `StakeAPIError`, `AuthenticationError`
+Popular fixtures for one sport (default `"soccer"`), mapped to [`SportEvent`](models.md#class-sportevent) objects with winner odds.
 
 ```python
-async with StakeAPI(access_token="...", cf_clearance="...") as client:
-    # All available events
-    events = await client.get_sports_events()
-
-    # Football only
-    football = await client.get_sports_events(sport="football")
-    for event in football:
-        print(f"{event.home_team} vs {event.away_team}")
-        print(f"  League: {event.league}")
-        print(f"  Starts: {event.start_time}")
-        print(f"  Live: {event.live}")
-        print(f"  Odds: {event.odds}")
+async with StakeAPI(cookie_file="cookie.txt") as client:
+    for event in await client.get_sports_events("basketball"):
+        print(f"{event.home_team} vs {event.away_team} ({event.league}): {event.odds}")
 ```
+
+---
+
+### `get_sport_index(sport="soccer", group="winner", search_type="popular", market_limit=1)`
+
+The raw data behind a sport's landing page: featured fixtures with odds, top tournaments, and every category with its tournaments.
+
+---
+
+### `get_sports(search_type="upcoming", sport_type="sport", limit=100)`
+
+Every sport with its fixture count. Pass `sport_type="esport"` for esports.
+
+### `get_trending_sports(limit=10)`
+
+The most popular sports.
+
+---
+
+### `get_fixtures(search_type="upcoming", sport_type="sport", group="winner", limit=20, offset=0, market_limit=1)`
+
+Fixtures across all sports. Returns `{"count": <total>, "fixtures": [...]}`.
+
+### `get_sport_fixtures(sport, search_type="upcoming", group="winner", tournament_limit=25, tournament_offset=0, fixture_limit=20, market_limit=1)`
+
+A sport's tournaments, each with its fixtures and odds.
+
+### `get_tournament(sport, category, tournament, search_type="upcoming", groups=None, limit=10, offset=0, market_limit=1)`
+
+One tournament by the slugs in its URL, `/sports/<sport>/<category>/<tournament>`.
+
+```python
+async with StakeAPI(cookie_file="cookie.txt") as client:
+    epl = await client.get_tournament("soccer", "england", "premier-league")
+    print(epl["name"], epl["fixtureCount"])
+```
+
+### `search_sports(query, group="winner", limit=20, offset=0)`
+
+Search fixtures by team, player or event name.
+
+---
+
+### `get_trending_matches(sort_by="totalBetCount", sport_id=None, groups=None)`
+
+The matches with the most betting activity, with user counts and bets per outcome.
+
+### `get_top_picks(sort_by="totalBetValue", sport_id=None)`
+
+The most-backed single outcomes.
+
+### `get_top_multis()`
+
+The most popular multi (accumulator) bets and their legs.
+
+---
+
+## Promotion & Info Methods
+
+### `get_challenges(limit=20, offset=0, sort="startAt", direction="desc")`
+
+Public casino challenges. Returns `{"count": <total>, "challenges": [...]}`.
+
+### `get_active_races(leaderboard_limit=10)`
+
+Running wager races, each with its leaderboard.
+
+### `get_currency_limits()`
+
+Maximum bet and maximum profit per currency: `{"btc": {"bet_max": 100.0, "bet_max_profit": 10.0}, ...}`.
 
 ---
 

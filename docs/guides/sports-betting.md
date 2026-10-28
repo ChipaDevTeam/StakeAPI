@@ -54,7 +54,7 @@ Get events for specific sports:
 ```python
 async with StakeAPI(access_token="your_token") as client:
     # Football/Soccer
-    football = await client.get_sports_events(sport="football")
+    football = await client.get_sports_events(sport="soccer")
     print(f"Football events: {len(football)}")
     
     # Basketball
@@ -121,7 +121,7 @@ Build tools to analyze odds and find value:
 ```python
 async def analyze_odds():
     async with StakeAPI(access_token="your_token") as client:
-        events = await client.get_sports_events(sport="football")
+        events = await client.get_sports_events(sport="soccer")
         
         print("📊 ODDS ANALYSIS")
         print("=" * 60)
