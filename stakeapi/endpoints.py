@@ -254,6 +254,175 @@ class GraphQLQueries:
     }
     """
 
+    # Validated against the live API — sport landing page (captured from the
+    # site's own SportIndex query): fixtures, tournaments and categories
+    SPORT_INDEX = """
+    query SportIndex($sport: String!, $group: String!, $type: SportSearchEnum = popular, $marketLimit: Int = 1) {
+      slugSport(sport: $sport) {
+        __typename
+        id
+        name
+        templates(group: $group) {
+          __typename
+          id
+          name
+          extId
+        }
+        firstTournament: tournamentList(type: $type, limit: 1) {
+          __typename
+          id
+          name
+          slug
+          category {
+            __typename
+            id
+            slug
+            name
+            countryCode
+          }
+          fixtureCount(type: $type)
+          fixtureList(type: $type, limit: 10) {
+            __typename
+            ...FixturePreview
+            groups(groups: [$group], status: [active, suspended, deactivated]) {
+              __typename
+              ...SportGroupTemplates
+            }
+          }
+        }
+        tournamentList(type: $type, limit: 5) {
+          __typename
+          id
+          name
+          slug
+          fixtureCount(type: $type)
+          category {
+            __typename
+            id
+            slug
+            name
+            countryCode
+          }
+        }
+        categoryList(type: $type, limit: 100) {
+          __typename
+          id
+          slug
+          name
+          countryCode
+          fixtureCount(type: $type)
+          tournamentList(type: $type, limit: 100) {
+            __typename
+            id
+            slug
+            name
+            fixtureCount(type: $type)
+          }
+        }
+      }
+    }
+
+    fragment FixturePreview on SportFixture {
+      __typename
+      id
+      stakeFixtureId
+      status
+      slug
+      name
+      provider
+      marketCount(status: [active, suspended])
+      extId
+      data {
+        __typename
+        ... on SportFixtureDataMatch {
+          startTime
+          isOutright
+          competitors {
+            __typename
+            name
+            extId
+            countryCode
+            abbreviation
+          }
+          teams {
+            __typename
+            extId
+            name
+            qualifier
+          }
+        }
+        ... on SportFixtureDataOutright {
+          isOutright
+          name
+          startTime
+          endTime
+        }
+      }
+      tournament {
+        __typename
+        id
+        name
+        slug
+        category {
+          __typename
+          id
+          name
+          slug
+          sport {
+            __typename
+            id
+            name
+            slug
+          }
+        }
+      }
+      eventStatus {
+        __typename
+        ... on SportFixtureEventStatusData {
+          homeScore
+          awayScore
+          matchStatus
+          clock {
+            __typename
+            matchTime
+            remainingTime
+          }
+        }
+      }
+    }
+
+    fragment SportGroupTemplates on SportGroup {
+      __typename
+      name
+      translation
+      rank
+      templates(limit: 10, includeEmpty: true) {
+        __typename
+        extId
+        rank
+        name
+        markets(limit: $marketLimit) {
+          __typename
+          id
+          name
+          status
+          extId
+          specifiers
+          provider
+          templateExtId
+          outcomes {
+            __typename
+            id
+            active
+            odds
+            probabilities
+            name
+          }
+        }
+      }
+    }
+    """
+
     # UNVERIFIED DRAFT — this query shape does not match the live schema;
     # kept only as a starting point for future work
     SPORTS_EVENTS = """

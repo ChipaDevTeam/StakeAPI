@@ -71,6 +71,41 @@ def _bet_from_entry(entry: Dict[str, Any]) -> Optional[Bet]:
         return None
 
 
+def _event_from_fixture(
+    fixture: Dict[str, Any], sport: Dict[str, Any], tournament: Dict[str, Any]
+) -> Optional[SportEvent]:
+    """Map a SportIndex fixture to a SportEvent model (None if unmappable)."""
+    data = fixture.get("data") or {}
+    teams = {t.get("qualifier"): t.get("name") for t in data.get("teams") or []}
+    start = _parse_datetime(data.get("startTime"))
+    if not start:
+        return None
+
+    odds: Dict[str, float] = {}
+    for group in fixture.get("groups") or []:
+        for template in group.get("templates") or []:
+            for market in template.get("markets") or []:
+                for outcome in market.get("outcomes") or []:
+                    if outcome.get("active") and outcome.get("odds") is not None:
+                        odds[outcome.get("name", "")] = float(outcome["odds"])
+
+    status = fixture.get("status") or ""
+    try:
+        return SportEvent(
+            id=str(fixture.get("id")),
+            sport=sport.get("name", ""),
+            league=tournament.get("name", ""),
+            home_team=teams.get("home") or fixture.get("name", ""),
+            away_team=teams.get("away") or "",
+            start_time=start,
+            status=status,
+            odds=odds,
+            live=status == "live",
+        )
+    except Exception:
+        return None
+
+
 class StakeAPI:
     """Main client for interacting with stake.com API."""
     
@@ -404,7 +439,7 @@ class StakeAPI:
         raise StakeAPIError(
             "get_casino_games is not supported yet: stake.com has no REST API "
             "and the GraphQL query for game lists has not been mapped. "
-            "Working methods: get_user_balance, get_user_profile, get_bet_history, get_all_house_bets, get_currency_rates."
+            "Working methods: get_user_balance, get_user_profile, get_bet_history, get_all_house_bets, get_currency_rates, get_sport_index, get_sports_events."
         )
 
     async def get_game_details(self, game_id: str) -> Game:
@@ -417,22 +452,61 @@ class StakeAPI:
         raise StakeAPIError(
             "get_game_details is not supported yet: stake.com has no REST API "
             "and the GraphQL query for game details has not been mapped. "
-            "Working methods: get_user_balance, get_user_profile, get_bet_history, get_all_house_bets, get_currency_rates."
+            "Working methods: get_user_balance, get_user_profile, get_bet_history, get_all_house_bets, get_currency_rates, get_sport_index, get_sports_events."
         )
 
     # Sports Methods
+    async def get_sport_index(
+        self,
+        sport: str = "soccer",
+        group: str = "winner",
+        search_type: str = "popular",
+        market_limit: int = 1,
+    ) -> Dict[str, Any]:
+        """
+        Get a sport's landing page: featured fixtures with odds, tournaments
+        and categories (the site's own SportIndex query).
+
+        Args:
+            sport: Sport slug, e.g. "soccer", "basketball", "tennis"
+            group: Market group to include odds for, e.g. "winner"
+            search_type: SportSearchEnum value, e.g. "popular", "live", "upcoming"
+            market_limit: Maximum markets returned per template
+
+        Returns:
+            The raw ``slugSport`` object (id, name, templates, firstTournament,
+            tournamentList, categoryList).
+        """
+        data = await self._graphql_request(
+            GraphQLQueries.SPORT_INDEX,
+            variables={
+                "sport": sport,
+                "group": group,
+                "type": search_type,
+                "marketLimit": market_limit,
+            },
+            operation_name="SportIndex",
+        )
+        sport_data = data.get("slugSport")
+        if not sport_data:
+            raise StakeAPIError(f"Unknown sport {sport!r}: {data!r}")
+        return sport_data
+
     async def get_sports_events(self, sport: Optional[str] = None) -> List[SportEvent]:
         """
-        Get available sports events.
+        Get popular fixtures for a sport (defaults to soccer) with winner odds.
 
-        Raises:
-            StakeAPIError: Always — see get_casino_games.
+        Args:
+            sport: Sport slug, e.g. "soccer", "basketball"
         """
-        raise StakeAPIError(
-            "get_sports_events is not supported yet: stake.com has no REST API "
-            "and the GraphQL query for sports events has not been mapped. "
-            "Working methods: get_user_balance, get_user_profile, get_bet_history, get_all_house_bets, get_currency_rates."
-        )
+        sport_data = await self.get_sport_index(sport or "soccer")
+        events: List[SportEvent] = []
+        for tournament in sport_data.get("firstTournament") or []:
+            for fixture in tournament.get("fixtureList") or []:
+                event = _event_from_fixture(fixture, sport_data, tournament)
+                if event:
+                    events.append(event)
+        return events
 
     # User Methods
     async def get_user_profile(self) -> User:
@@ -525,7 +599,7 @@ class StakeAPI:
         raise StakeAPIError(
             "place_bet is not supported yet: stake.com has no REST API and the "
             "GraphQL mutations for placing bets have not been mapped. "
-            "Working methods: get_user_balance, get_user_profile, get_bet_history, get_all_house_bets, get_currency_rates."
+            "Working methods: get_user_balance, get_user_profile, get_bet_history, get_all_house_bets, get_currency_rates, get_sport_index, get_sports_events."
         )
 
     async def get_bet_history(self, limit: int = 50, offset: int = 0) -> List[Bet]:
