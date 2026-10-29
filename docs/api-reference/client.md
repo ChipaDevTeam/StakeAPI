@@ -404,6 +404,44 @@ async with StakeAPI(access_token="...", cf_clearance="...") as client:
 
 ---
 
+## Account Methods
+
+These read your own account, so they need a logged-in session (access token or `cookie_file`). Without one they raise `PermissionDeniedError`. The one exception is `get_user_stats()`, which looks up any player's public profile.
+
+| Method | Returns |
+|:-------|:--------|
+| `get_user_stats(name)` | Any player's public profile: join date, VIP flags, high-roller badges, and per-currency bet stats (`statisticScoped` is `None` if they hide them). No login needed. |
+| `get_account_status()` | KYC status, email/phone verification, ban/suspension flags, self-exclusion |
+| `get_vip_info()` | VIP rank `flags`, `flagProgress` to the next rank, `rakeback` balances, `reload`, `dailyBonus`, `topUpBonus`, and your VIP host (`vipInfo`) |
+| `get_claimable_bonuses()` | Self-serve bonuses you can claim now |
+| `get_unclaimed_bonuses(limit=20, offset=0)` | Bonus codes credited to you but not redeemed |
+| `get_active_rollovers()` | Wagering requirements on your bonuses (`amount`, `progress`, `expectedAmount`, `maxBet`) |
+| `get_seed_pair()` | Provably-fair seeds: `client_seed`, `server_seed_hash`, `next_server_seed_hash`, `nonce`, `active_bets` |
+| `get_sport_bet_history(limit=20, offset=0, status=None)` | Your sports bets; filter `status` with `"confirmed"` (open), `"settled"`, `"cashout"`, `"cancelled"` |
+| `get_active_sport_bets(limit=20, offset=0)` | Your open sports bets |
+| `get_deposits(limit=10, offset=0)` / `get_withdrawals(limit=10, offset=0)` | Crypto deposits and withdrawals (amount, currency, chain, status, hash) |
+| `get_tip_history(limit=20, offset=0, name=None)` | Tips you sent and received |
+| `get_game_statistics(period="all", sort="wagered", limit=20, offset=0)` | Per-game bet count, wagered, profit and RTP. `period`: `"day"`, `"week"`, `"month"`, `"all"`. `sort`: `"wagered"`, `"profit"`, `"bets"`, `"rtp"` |
+| `get_favourite_games(limit=50, offset=0)` / `get_recent_games(limit=20, offset=0)` | `List[Game]` |
+| `get_race_positions(limit=20, offset=0)` | Your positions and payouts in races |
+| `get_notifications(limit=20, offset=0)` | Notifications; `data.__typename` says what each one is (`"ChatTip"`, `"WalletDeposit"`, `"NotificationUserBonus"`, ...) |
+| `get_gambling_limits()` | Responsible-gambling limits on your account |
+| `get_sessions(limit=10, offset=0)` | Login sessions (device, IP, location, last seen) |
+
+```python
+async with StakeAPI(cookie_file="cookie.txt") as client:
+    vip = await client.get_vip_info()
+    print("VIP progress:", vip["flagProgress"])
+
+    for stat in await client.get_game_statistics(period="month", sort="profit", limit=5):
+        print(f"{stat['game']['name']}: {stat['betCount']} bets, profit {stat['profitValue']}")
+
+    seeds = await client.get_seed_pair()
+    print("Server seed hash:", seeds["server_seed_hash"], "nonce:", seeds["nonce"])
+```
+
+---
+
 ## Betting Methods
 
 ### `place_bet(bet_data)`
@@ -443,19 +481,23 @@ async with StakeAPI(access_token="...", cf_clearance="...") as client:
 
 ---
 
-### `get_bet_history(limit=50)`
+### `get_bet_history(limit=50, offset=0, game=None)`
 
 ```python
-async def get_bet_history(self, limit: int = 50) -> List[Bet]
+async def get_bet_history(
+    self, limit: int = 50, offset: int = 0, game: Optional[str] = None
+) -> List[Bet]
 ```
 
-Retrieve the authenticated user's recent bet history.
+Retrieve the authenticated user's recent casino bet history.
 
 **Parameters:**
 
 | Parameter | Type | Default | Description |
 |:----------|:-----|:--------|:------------|
-| `limit` | `int` | `50` | Maximum number of bets to return. Higher values may be slower. |
+| `limit` | `int` | `50` | Maximum number of bets to return |
+| `offset` | `int` | `0` | Bets to skip, for pagination |
+| `game` | `Optional[str]` | `None` | Only one Stake Original, e.g. `"dice"`, `"limbo"`, `"mines"`, `"plinko"`, `"crash"`, `"dragonTower"`, `"videoPoker"` |
 
 **Returns:** `List[Bet]` — Most recent bets first.
 

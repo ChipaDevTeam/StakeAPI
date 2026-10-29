@@ -444,7 +444,10 @@ class StakeAPI:
             ]
             joined = ", ".join(error_messages)
 
-            permission_markers = ("not allowed", "unauthorized", "permission", "forbidden")
+            permission_markers = (
+                "not allowed", "unauthorized", "permission", "forbidden",
+                "notauthenticated", "please log in",
+            )
             if any(
                 marker in msg.lower()
                 for msg in error_messages + error_types
@@ -944,20 +947,24 @@ class StakeAPI:
             " plus the public casino, sports and promotion methods."
         )
 
-    async def get_bet_history(self, limit: int = 50, offset: int = 0) -> List[Bet]:
+    async def get_bet_history(
+        self, limit: int = 50, offset: int = 0, game: Optional[str] = None
+    ) -> List[Bet]:
         """
         Get user casino bet history using GraphQL.
 
         Args:
             limit: Maximum number of bets to return
             offset: Number of bets to skip (for pagination)
+            game: Only bets on one Stake Original (BetHouseEnum), e.g. "dice",
+                "limbo", "mines", "plinko", "crash", "dragonTower", "videoPoker"
 
         Returns:
             List of bets, newest first
         """
         data = await self._graphql_request(
             GraphQLQueries.BET_HISTORY,
-            variables={"limit": limit, "offset": offset},
+            variables={"limit": limit, "offset": offset, "game": game},
             operation_name="BetHistory",
         )
         entries = (data.get("user") or {}).get("houseBetList") or []
@@ -1090,3 +1097,231 @@ class StakeAPI:
             GraphQLQueries.PUBLIC_CHATS, operation_name="PublicChats"
         )
         return data.get("publicChats") or []
+
+    # Account Methods
+    async def _user_query(
+        self,
+        query: str,
+        operation_name: str,
+        variables: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Run a query rooted at ``user`` and return the user object."""
+        data = await self._graphql_request(
+            query, variables=variables, operation_name=operation_name
+        )
+        user = data.get("user")
+        if not user:
+            raise StakeAPIError(
+                f"No user data in {operation_name} response: {data!r}. "
+                "Your session may have expired — refresh your cookies."
+            )
+        return user
+
+    async def get_user_stats(self, name: str) -> Dict[str, Any]:
+        """
+        Get any player's public profile by username: join date, VIP flags,
+        high-roller badges and (unless they hide them) bet statistics.
+
+        This works without logging in.
+
+        Returns:
+            The user object. ``statisticScoped`` is a list of per-currency
+            stats (bets, wins, losses, betAmount, betValue), or None when the
+            player hides their stats.
+        """
+        data = await self._graphql_request(
+            GraphQLQueries.USER_STATS, variables={"name": name}, operation_name="UserDetails"
+        )
+        user = data.get("user")
+        if not user:
+            raise StakeAPIError(f"Unknown user {name!r}")
+        return user
+
+    async def get_account_status(self) -> Dict[str, Any]:
+        """
+        Get your account's verification and restriction status: kycStatus,
+        email/phone verification, ban/suspension flags and self-exclusion.
+        """
+        return await self._user_query(GraphQLQueries.ACCOUNT_STATUS, "UserKycInfo")
+
+    async def get_vip_info(self) -> Dict[str, Any]:
+        """
+        Get your VIP data: rank flags, progress to the next rank, rakeback
+        balances, reload, daily and top-up bonuses, and your VIP host.
+
+        Returns:
+            The user object with ``flags``, ``flagProgress``, ``rakeback``,
+            ``reload``, ``dailyBonus``, ``topUpBonus`` and ``vipInfo``
+            (each may be None if it does not apply to your account).
+        """
+        return await self._user_query(GraphQLQueries.VIP_INFO, "VipMeta")
+
+    async def get_claimable_bonuses(self) -> List[Dict[str, Any]]:
+        """Get self-serve bonuses you can claim now (bonusCodeId, code, category, availableAt)."""
+        data = await self._graphql_request(
+            GraphQLQueries.CLAIMABLE_BONUSES, operation_name="ClaimableVipRewards"
+        )
+        return data.get("claimableSelfServeBonuses") or []
+
+    async def get_unclaimed_bonuses(self, limit: int = 20, offset: int = 0) -> List[Dict[str, Any]]:
+        """Get bonus codes credited to you that have not been redeemed."""
+        data = await self._graphql_request(
+            GraphQLQueries.UNCLAIMED_BONUSES,
+            variables={"limit": limit, "offset": offset},
+            operation_name="UserBonusUnclaimedList",
+        )
+        return data.get("userBonusUnclaimedList") or []
+
+    async def get_active_rollovers(self) -> List[Dict[str, Any]]:
+        """Get wagering requirements on your bonuses (amount, progress, expectedAmount, maxBet)."""
+        user = await self._user_query(GraphQLQueries.ACTIVE_ROLLOVERS, "UserActiveRollovers")
+        return user.get("activeRollovers") or []
+
+    async def get_seed_pair(self) -> Dict[str, Any]:
+        """
+        Get your provably-fair seeds for Stake Originals.
+
+        Returns:
+            {"client_seed": ..., "server_seed_hash": ..., "next_server_seed_hash": ...,
+             "nonce": ..., "active_bets": [...]}. Bets still in progress
+            (e.g. an open Mines round) block seed rotation.
+        """
+        user = await self._user_query(GraphQLQueries.SEED_PAIR, "UserSeedPair")
+        client_seed = user.get("activeClientSeed") or {}
+        server_seed = user.get("activeServerSeed") or {}
+        return {
+            "client_seed": client_seed.get("seed"),
+            "server_seed_hash": server_seed.get("seedHash"),
+            "next_server_seed_hash": server_seed.get("nextSeedHash"),
+            "nonce": server_seed.get("nonce"),
+            "active_bets": user.get("activeCasinoBets") or [],
+        }
+
+    async def get_sport_bet_history(
+        self, limit: int = 20, offset: int = 0, status: Optional[List[str]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Get your sports bets, newest first.
+
+        Args:
+            status: Filter by SportBetStatusEnum values: "confirmed" (open),
+                "settled", "cashout", "cancelled"
+
+        Returns:
+            Bets with amount, currency, payout, potentialMultiplier and
+            outcomes (odds, fixtureName). Racing and Swish bets are skipped.
+        """
+        user = await self._user_query(
+            GraphQLQueries.SPORT_BET_HISTORY,
+            "SportSportList",
+            {"limit": limit, "offset": offset, "status": status},
+        )
+        return [
+            {"iid": entry.get("iid"), **entry["bet"]}
+            for entry in user.get("sportBetList") or []
+            if (entry.get("bet") or {}).get("__typename") == "SportBet"
+        ]
+
+    async def get_active_sport_bets(self, limit: int = 20, offset: int = 0) -> List[Dict[str, Any]]:
+        """Get your open sports bets."""
+        user = await self._user_query(
+            GraphQLQueries.ACTIVE_SPORT_BETS, "ActiveBets_User", {"limit": limit, "offset": offset}
+        )
+        return user.get("activeSportBets") or []
+
+    async def get_deposits(self, limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
+        """Get your crypto deposits (amount, currency, chain, status, hash)."""
+        user = await self._user_query(
+            GraphQLQueries.DEPOSITS, "DepositList", {"limit": limit, "offset": offset}
+        )
+        return user.get("depositList") or []
+
+    async def get_withdrawals(self, limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
+        """Get your crypto withdrawals (amount, currency, chain, status, hash, address)."""
+        user = await self._user_query(
+            GraphQLQueries.WITHDRAWALS, "WithdrawalList", {"limit": limit, "offset": offset}
+        )
+        return user.get("withdrawalList") or []
+
+    async def get_tip_history(
+        self, limit: int = 20, offset: int = 0, name: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Get tips you sent and received.
+
+        Args:
+            name: Your username. Looked up from your account when omitted.
+        """
+        if not name:
+            name = (await self.get_account_status()).get("name")
+        user = await self._user_query(
+            GraphQLQueries.TIP_HISTORY,
+            "UserTipHistory",
+            {"name": name, "limit": limit, "offset": offset},
+        )
+        return user.get("tipHistory") or []
+
+    async def get_game_statistics(
+        self, period: str = "all", sort: str = "wagered", limit: int = 20, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get your per-game totals: bet count, wagered, profit and RTP.
+
+        Args:
+            period: "day", "week", "month" or "all"
+            sort: "wagered", "profit", "bets" or "rtp"
+        """
+        data = await self._graphql_request(
+            GraphQLQueries.GAME_STATISTICS,
+            variables={"period": period, "sort": sort, "limit": limit, "offset": offset},
+            operation_name="UserGameStatisticList",
+        )
+        return data.get("userGameStatisticList") or []
+
+    async def get_favourite_games(self, limit: int = 50, offset: int = 0) -> List[Game]:
+        """Get the casino games you marked as favourite."""
+        user = await self._user_query(
+            GraphQLQueries.FAVOURITE_GAMES, "UserFavouriteGames", {"limit": limit, "offset": offset}
+        )
+        return [g for g in map(_game_from_kurator, user.get("favouriteGameList") or []) if g]
+
+    async def get_recent_games(self, limit: int = 20, offset: int = 0) -> List[Game]:
+        """Get the casino games you played most recently."""
+        user = await self._user_query(
+            GraphQLQueries.RECENT_GAMES, "UserRecentGameList", {"limit": limit, "offset": offset}
+        )
+        return [g for g in map(_game_from_kurator, user.get("recentGameList") or []) if g]
+
+    async def get_race_positions(self, limit: int = 20, offset: int = 0) -> List[Dict[str, Any]]:
+        """Get your finishing positions and payouts in past and current races."""
+        user = await self._user_query(
+            GraphQLQueries.RACE_POSITIONS, "UserRacePositionList", {"limit": limit, "offset": offset}
+        )
+        return user.get("racePositionList") or []
+
+    async def get_notifications(self, limit: int = 20, offset: int = 0) -> List[Dict[str, Any]]:
+        """
+        Get your notifications, newest first.
+
+        Each has ``type``, ``createdAt``, ``acknowledged`` and ``data``, whose
+        ``__typename`` tells what it is (e.g. "ChatTip", "WalletDeposit",
+        "NotificationUserBonus", "RacePosition", "SportBet").
+        """
+        user = await self._user_query(
+            GraphQLQueries.NOTIFICATIONS, "NotificationList", {"limit": limit, "offset": offset}
+        )
+        return user.get("notificationList") or []
+
+    async def get_gambling_limits(self) -> List[Dict[str, Any]]:
+        """Get the responsible-gambling limits set on your account (type, period, value, progress)."""
+        user = await self._user_query(
+            GraphQLQueries.GAMBLING_LIMITS, "ResponsibleGamblingLimitList"
+        )
+        return user.get("responsibleGamblingLimits") or []
+
+    async def get_sessions(self, limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
+        """Get your login sessions (device name, IP, location, active, last seen)."""
+        user = await self._user_query(
+            GraphQLQueries.SESSIONS, "SessionList", {"limit": limit, "offset": offset}
+        )
+        return user.get("sessionList") or []

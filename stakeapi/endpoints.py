@@ -172,6 +172,31 @@ _GAME_FRAGMENT = """
 """
 
 
+_SPORT_BET_FRAGMENT = """
+    fragment LibSportBet on SportBet {
+      id
+      amount
+      currency
+      payout
+      potentialMultiplier
+      payoutMultiplier
+      cashoutMultiplier
+      customBet
+      createdAt
+      outcomes {
+        id
+        odds
+        fixtureName
+        fixture {
+          id
+          slug
+          status
+        }
+      }
+    }
+"""
+
+
 class GraphQLQueries:
     """GraphQL query constants for stake.com API."""
     
@@ -592,9 +617,9 @@ class GraphQLQueries:
     # Validated against the live API — bet history is user.houseBetList;
     # 'game' on the outer Bet is an object, while CasinoBet.game is an enum
     BET_HISTORY = """
-    query BetHistory($limit: Int!, $offset: Int!) {
+    query BetHistory($limit: Int!, $offset: Int!, $game: BetHouseEnum) {
       user {
-        houseBetList(limit: $limit, offset: $offset) {
+        houseBetList(limit: $limit, offset: $offset, game: $game) {
           id
           iid
           game {
@@ -1023,6 +1048,429 @@ class GraphQLQueries:
         id
         name
         isPublic
+      }
+    }
+    """
+    # ------------------------------------------------------------------
+    # Account queries. USER_STATS is public (any username); the rest need a
+    # logged-in session. Trimmed from the site's operations of the same name
+    # and validated against the live schema.
+    # ------------------------------------------------------------------
+
+    USER_STATS = """
+    query UserDetails($name: String!) {
+      user(name: $name) {
+        id
+        name
+        createdAt
+        isHighroller
+        isSportHighroller
+        flags {
+          flag
+          rank
+          createdAt
+        }
+        statisticScoped {
+          scope
+          currency
+          bets
+          wins
+          losses
+          ties
+          betAmount
+          betValue
+        }
+      }
+    }
+    """
+
+    ACCOUNT_STATUS = """
+    query UserKycInfo {
+      user {
+        id
+        name
+        email
+        createdAt
+        kycStatus
+        hasEmailVerified
+        hasPhoneNumberVerified
+        isBanned
+        isSuspended
+        isSuspendedSportsbook
+        selfExclude {
+          id
+          status
+          active
+          expireAt
+        }
+      }
+    }
+    """
+
+    VIP_INFO = """
+    query VipMeta {
+      user {
+        id
+        flags {
+          flag
+        }
+        flagProgress {
+          flag
+          progress
+        }
+        rakeback {
+          enabled
+          balances {
+            currency
+            availableAmount
+            receivedAmount
+          }
+        }
+        reload: faucet {
+          id
+          value
+          baseValue
+          active
+          claimInterval
+          lastClaim
+          expireAt
+        }
+        dailyBonus {
+          id
+          active
+          lastClaim
+          amounts {
+            currency
+            amount
+          }
+        }
+        topUpBonus {
+          id
+          active
+          claimCount
+          lastClaim
+          amounts {
+            currency
+            amount
+          }
+        }
+        vipInfo {
+          hostStatus
+          host {
+            name
+            email
+            contactHandle
+            contactLink
+          }
+        }
+      }
+    }
+    """
+
+    CLAIMABLE_BONUSES = """
+    query ClaimableVipRewards {
+      claimableSelfServeBonuses {
+        bonusCodeId
+        code
+        category
+        availableAt
+      }
+    }
+    """
+
+    UNCLAIMED_BONUSES = """
+    query UserBonusUnclaimedList($limit: Int, $offset: Int) {
+      userBonusUnclaimedList(limit: $limit, offset: $offset) {
+        amount
+        currency
+        value
+        redeemed
+        claimedAt
+        bonusCode {
+          id
+          code
+          note
+          expiresAt
+        }
+      }
+    }
+    """
+
+    ACTIVE_ROLLOVERS = """
+    query UserActiveRollovers {
+      user {
+        id
+        activeRollovers {
+          id
+          type
+          currency
+          amount
+          maxBet
+          progress
+          expectedAmount
+        }
+      }
+    }
+    """
+
+    SEED_PAIR = """
+    query UserSeedPair {
+      user {
+        id
+        activeClientSeed {
+          id
+          seed
+        }
+        activeServerSeed {
+          id
+          nonce
+          seedHash
+          nextSeedHash
+        }
+        activeCasinoBets {
+          id
+          amount
+          currency
+          game
+          createdAt
+        }
+      }
+    }
+    """
+
+    SPORT_BET_HISTORY = """
+    query SportSportList($limit: Int!, $offset: Int!, $status: [SportBetStatusEnum!]) {
+      user {
+        id
+        sportBetList(limit: $limit, offset: $offset, status: $status) {
+          id
+          iid
+          bet {
+            __typename
+            ... on SportBet {
+              ...LibSportBet
+            }
+          }
+        }
+      }
+    }
+    """ + _SPORT_BET_FRAGMENT
+
+    ACTIVE_SPORT_BETS = """
+    query ActiveBets_User($limit: Int!, $offset: Int!) {
+      user {
+        id
+        activeSportBets(limit: $limit, offset: $offset) {
+          ...LibSportBet
+        }
+      }
+    }
+    """ + _SPORT_BET_FRAGMENT
+
+    DEPOSITS = """
+    query DepositList($offset: Int = 0, $limit: Int = 10) {
+      user {
+        id
+        depositList(offset: $offset, limit: $limit) {
+          id
+          createdAt
+          confirmedAt
+          amount
+          currency
+          status
+          chain
+          hash
+          address {
+            address
+          }
+        }
+      }
+    }
+    """
+
+    WITHDRAWALS = """
+    query WithdrawalList($offset: Int = 0, $limit: Int = 10) {
+      user {
+        id
+        withdrawalList(offset: $offset, limit: $limit) {
+          id
+          createdAt
+          confirmedAt
+          transferredAt
+          amount
+          currency
+          status
+          chain
+          hash
+          address
+        }
+      }
+    }
+    """
+
+    TIP_HISTORY = """
+    query UserTipHistory($name: String!, $limit: Int, $offset: Int) {
+      user(name: $name) {
+        id
+        tipHistory(limit: $limit, offset: $offset) {
+          id
+          amount
+          currency
+          createdAt
+          isPublic
+          sendBy {
+            id
+            name
+          }
+          user {
+            id
+            name
+          }
+        }
+      }
+    }
+    """
+
+    GAME_STATISTICS = """
+    query UserGameStatisticList($period: UserGameInsightsPeriodEnum!, $limit: Int, $offset: Int, $sort: UserGameInsightsSortEnum) {
+      userGameStatisticList(period: $period, limit: $limit, offset: $offset, sort: $sort) {
+        gameId
+        betCount
+        wageredValue
+        profitValue
+        rtp
+        game {
+          id
+          name
+          slug
+        }
+      }
+    }
+    """
+
+    FAVOURITE_GAMES = """
+    query UserFavouriteGames($limit: Int, $offset: Int) {
+      user {
+        id
+        favouriteGameList(limit: $limit, offset: $offset) {
+          ...LibGame
+        }
+      }
+    }
+    """ + _GAME_FRAGMENT
+
+    RECENT_GAMES = """
+    query UserRecentGameList($limit: Int, $offset: Int) {
+      user {
+        id
+        recentGameList(limit: $limit, offset: $offset) {
+          ...LibGame
+        }
+      }
+    }
+    """ + _GAME_FRAGMENT
+
+    RACE_POSITIONS = """
+    query UserRacePositionList($offset: Int, $limit: Int) {
+      user {
+        id
+        racePositionList(offset: $offset, limit: $limit) {
+          position
+          wageredAmount
+          payoutAmount
+          currency
+          race {
+            id
+            name
+            type
+            startTime
+            endTime
+          }
+        }
+      }
+    }
+    """
+
+    NOTIFICATIONS = """
+    query NotificationList($limit: Int, $offset: Int) {
+      user {
+        id
+        notificationList(limit: $limit, offset: $offset) {
+          id
+          type
+          createdAt
+          acknowledged
+          data {
+            __typename
+            ... on ChatTip {
+              amount
+              currency
+              sendBy {
+                name
+              }
+            }
+            ... on NotificationUserBonus {
+              amount
+              currency
+              types
+            }
+            ... on WalletDeposit {
+              id
+              amount
+              currency
+              chain
+              walletStatus: status
+            }
+            ... on RacePosition {
+              position
+              payoutAmount
+              currency
+              race {
+                name
+              }
+            }
+            ... on SportBet {
+              id
+              amount
+              payout
+              currency
+            }
+          }
+        }
+      }
+    }
+    """
+
+    GAMBLING_LIMITS = """
+    query ResponsibleGamblingLimitList {
+      user {
+        id
+        responsibleGamblingLimits {
+          id
+          type
+          period
+          value
+          progress
+          currency
+          coolingOff
+        }
+      }
+    }
+    """
+
+    SESSIONS = """
+    query SessionList($offset: Int = 0, $limit: Int = 10) {
+      user {
+        id
+        sessionList(offset: $offset, limit: $limit) {
+          id
+          sessionName
+          ip
+          country
+          city
+          active
+          updatedAt
+        }
       }
     }
     """

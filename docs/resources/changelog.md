@@ -29,6 +29,13 @@ This project follows [Semantic Versioning](https://semver.org/).
 - `Game` model: new `slug` and `player_count` fields
 - **Live data over WebSocket**: `StakeWebSocket` (via `client.websocket()`) with streams for Crash, Slide, casino and sports bet feeds, live odds and scores, races, chat and session expiry, plus `subscribe()` for any subscription
 - `get_public_chats()` lists public chat rooms
+- **Account data**: `get_account_status()`, `get_vip_info()`, `get_claimable_bonuses()`, `get_unclaimed_bonuses()`, `get_active_rollovers()`, `get_seed_pair()`, `get_sport_bet_history()`, `get_active_sport_bets()`, `get_deposits()`, `get_withdrawals()`, `get_tip_history()`, `get_game_statistics()`, `get_favourite_games()`, `get_recent_games()`, `get_race_positions()`, `get_notifications()`, `get_gambling_limits()` and `get_sessions()`
+- `get_user_stats(name)` looks up any player's public profile without logging in
+- `get_bet_history()` takes `offset` and a `game` filter
+
+### Changed
+
+- "Please log in." errors now raise `PermissionDeniedError` instead of a plain `GraphQLError`
 
 ---
 
