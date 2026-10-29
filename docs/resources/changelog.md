@@ -33,8 +33,11 @@ This project follows [Semantic Versioning](https://semver.org/).
 - `get_user_stats(name)` looks up any player's public profile without logging in
 - `get_bet_history()` takes `offset` and a `game` filter
 
+- **Betting (unvalidated)**: `dice_roll()`, `casino_bet()` for any Stake Original, `crash_bet()`, `crash_cashout()`, `slide_bet()`, `flip_bet()`, `flip_next()`, `flip_cashout()`, `zoo_bet()`, `place_sport_bet()` and `cashout_sport_bet()`. They are off unless the client is created with `allow_betting=True` (`BettingDisabledError` otherwise), and all support `dry_run=True`
+
 ### Changed
 
+- `place_bet()` now explains which per-game method to use instead of saying betting is unmapped
 - "Please log in." errors now raise `PermissionDeniedError` instead of a plain `GraphQLError`
 
 ---

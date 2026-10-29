@@ -108,7 +108,7 @@ Yes. Stake.com enforces rate limits. The default is 10 requests/second. See the 
 
 ### Can I place bets with the API?
 
-Yes, using the `place_bet()` method. Always gamble responsibly.
+Yes. Each game has its own method, such as `dice_roll()`, `crash_bet()` or `place_sport_bet()`, and the client must be created with `allow_betting=True`. These methods are not yet tested against the live site, so start with `dry_run=True` and tiny amounts. Always gamble responsibly.
 
 ### Can I make deposits or withdrawals?
 

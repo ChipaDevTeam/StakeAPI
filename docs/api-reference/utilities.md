@@ -283,13 +283,13 @@ game = await client.get_game_details("dice")
 amount = Decimal("0.00001")
 
 if validate_bet_amount(amount, game.min_bet, game.max_bet):
-    bet = await client.place_bet({"game_id": game.id, "amount": float(amount)})
+    result = await client.dice_roll(float(amount), "btc", target=50.5)
 else:
     print(f"Amount must be between {game.min_bet} and {game.max_bet}")
 ```
 
 {: .warning }
-> Always validate amounts client-side before calling `place_bet()`. Submitting an invalid amount wastes a network round-trip and may contribute to rate-limiting.
+> Always validate amounts client-side before calling a bet method. Submitting an invalid amount wastes a network round-trip and may contribute to rate-limiting.
 
 ---
 

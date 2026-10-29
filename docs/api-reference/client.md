@@ -444,40 +444,36 @@ async with StakeAPI(cookie_file="cookie.txt") as client:
 
 ## Betting Methods
 
-### `place_bet(bet_data)`
-
-```python
-async def place_bet(self, bet_data: Dict[str, Any]) -> Bet
-```
-
-Place a bet on a casino game or sports event.
-
-**Parameters:**
-
-| Parameter | Type | Description |
-|:----------|:-----|:------------|
-| `bet_data` | `Dict[str, Any]` | Dictionary containing all bet fields required by the endpoint |
-
-**Returns:** [`Bet`](models.md#class-bet) object with the placed bet's ID, status, and payout information.
-
-**Raises:** `InsufficientFundsError`, `ValidationError`, `AuthenticationError`, `StakeAPIError`
-
-```python
-async with StakeAPI(access_token="...", cf_clearance="...") as client:
-    bet = await client.place_bet({
-        "game_id": "dice",
-        "amount": 0.00001,
-        "currency": "btc",
-        "target": 50.0,   # example field — varies by game
-    })
-    print(f"Bet ID:     {bet.id}")
-    print(f"Amount:     {bet.amount}")
-    print(f"Potential:  {bet.potential_payout}")
-    print(f"Status:     {bet.status}")
-```
-
 {: .warning }
-> Always validate amounts with [`validate_bet_amount()`](utilities.md#validate_bet_amount) before calling this method to avoid unnecessary API errors.
+> **Unvalidated, real money.** These methods were built from the site's own code but have never been sent to the live API. Try each one with `dry_run=True` first, then with the smallest possible amount, before relying on it.
+
+Every bet method:
+
+- needs the client to be created with `allow_betting=True`, and raises `BettingDisabledError` otherwise
+- takes `dry_run=True`, which returns the request it would send (endpoint, operation and variables) without sending anything, and works even without `allow_betting`
+- rejects negative amounts and missing currencies with `ValidationError` before sending
+
+```python
+async with StakeAPI(cookie_file="cookie.txt", allow_betting=True) as client:
+    print(await client.dice_roll(0, "btc", target=50.5, condition="above", dry_run=True))
+
+    result = await client.dice_roll(0.00000100, "btc", target=50.5, condition="above")
+    print(result["payoutMultiplier"], result["payout"])
+```
+
+| Method | Game | Notes |
+|:-------|:-----|:------|
+| `dice_roll(amount, currency, target, condition="above")` | Dice | `target` 2–98, `condition` `"above"`/`"below"`. Request shape taken from the site's code. |
+| `casino_bet(path, variables)` | Any Stake Original | POSTs JSON to `/_api/casino/<path>` and returns the result object. Known paths: `"dice/roll"`, `"limbo/bet"`, `"mines/bet"`, `"mines/next"`. Copy the variables for games other than Dice from DevTools. |
+| `crash_bet(amount, currency, cashout_at)` | Crash | Joins the next round with an auto-cashout multiplier |
+| `crash_cashout()` | Crash | Cashes out now |
+| `slide_bet(currency, bets, identifier=None)` | Slide | `bets` passed through as given |
+| `flip_bet(amount, currency, guesses, identifier=None)`, `flip_next(condition)`, `flip_cashout(identifier)` | Flip | Enum values not confirmed |
+| `zoo_bet(currency, animals, identifier=None)` | Zoo | `animals` passed through as given |
+| `place_sport_bet(amount, currency, outcome_ids, odds_change, bet_type, identifier=None)` | Sports | `outcome_ids` from any fixture's markets. `odds_change` and `bet_type` are required because their valid values are not confirmed; copy them from a `BetSlipFooter_SportBet` request in DevTools. |
+| `cashout_sport_bet(bet_id, multiplier, cashout_percent=None)` | Sports | `bet_id` from `get_active_sport_bets()` |
+
+`place_bet(bet_data)` is kept for compatibility but always raises, pointing to the per-game methods above.
 
 ---
 

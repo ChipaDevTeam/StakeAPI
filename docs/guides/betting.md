@@ -17,10 +17,35 @@ Place bets, track your history, and manage your wagers programmatically.
 
 ## Overview
 
-The Betting API allows you to place bets, view your complete bet history, check individual bet details, and analyze your betting performance. All operations require a valid [Stake.com account](https://stake.com/?c=WY7953wQ).
+Stake has no single "place bet" endpoint. Each game has its own call: Stake Originals such as Dice use REST endpoints under `/_api/casino/`, while Crash, Slide, Flip, Zoo and sports bets use GraphQL mutations. StakeAPI has a method for each. See [Betting Methods](../api-reference/client.md#betting-methods) for the full list.
 
 {: .warning }
 > **Responsible Gambling:** Always gamble responsibly. Set limits and never bet more than you can afford to lose. StakeAPI is a tool — use it wisely.
+
+{: .warning }
+> **Unvalidated.** The betting methods have never been run against the live site. Use `dry_run=True` first, then the smallest amount you can.
+
+## Turning betting on
+
+Betting is off by default, so a script cannot place a bet by accident. Pass `allow_betting=True` to enable it:
+
+```python
+client = StakeAPI(cookie_file="cookie.txt", allow_betting=True)
+```
+
+Without it, every bet method raises `BettingDisabledError`.
+
+## Dry runs
+
+`dry_run=True` returns the request that would be sent, without sending it. This works even when betting is disabled:
+
+```python
+async with StakeAPI(cookie_file="cookie.txt") as client:
+    print(await client.crash_bet(0.0001, "btc", cashout_at=2.0, dry_run=True))
+    # {'dry_run': True, 'endpoint': '/_api/graphql',
+    #  'operation_name': 'MultiplayerCrashBet',
+    #  'variables': {'amount': 0.0001, 'currency': 'btc', 'cashoutAt': 2.0}}
+```
 
 ## Place a Bet
 
@@ -28,22 +53,22 @@ The Betting API allows you to place bets, view your complete bet history, check 
 import asyncio
 from stakeapi import StakeAPI
 
-async def place_a_bet():
-    async with StakeAPI(access_token="your_token") as client:
-        bet = await client.place_bet({
-            "game_id": "game_123",
-            "amount": 0.001,
-            "currency": "btc",
-            "bet_type": "single"
-        })
-        
-        print(f"✅ Bet placed!")
-        print(f"   Bet ID: {bet.id}")
-        print(f"   Amount: {bet.amount}")
-        print(f"   Potential Payout: {bet.potential_payout}")
-        print(f"   Status: {bet.status}")
+async def roll_dice():
+    async with StakeAPI(cookie_file="cookie.txt", allow_betting=True) as client:
+        result = await client.dice_roll(0.00000100, "btc", target=50.5, condition="above")
+        print(f"Payout: {result['payout']} ({result['payoutMultiplier']}x)")
 
-asyncio.run(place_a_bet())
+asyncio.run(roll_dice())
+```
+
+For other Stake Originals, copy the request body from your browser (DevTools → Network → the request to `/_api/casino/<game>/...`) and send it with `casino_bet()`:
+
+```python
+result = await client.casino_bet("limbo/bet", {
+    "amount": 0.00000100,
+    "currency": "btc",
+    # ...the other fields exactly as the site sends them
+})
 ```
 
 ## Get Bet History

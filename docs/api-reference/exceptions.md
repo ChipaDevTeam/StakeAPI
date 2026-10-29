@@ -191,7 +191,7 @@ async with StakeAPI(access_token="...", cf_clearance="...") as client:
     try:
         if not validate_bet_amount(amount, Decimal("0.00001"), Decimal("100")):
             raise ValidationError(f"Bet amount {amount} is below the minimum.")
-        bet = await client.place_bet({"amount": amount, "game_id": "dice"})
+        result = await client.dice_roll(float(amount), "btc", target=50.5)
     except ValidationError as e:
         print(f"Validation failed: {e}")
 ```
@@ -269,22 +269,21 @@ class InsufficientFundsError(StakeAPIError):
 ```
 
 **When raised:**
-- `place_bet()` is called but the wallet balance is less than the bet amount
+- A bet method is called but the wallet balance is less than the bet amount
 - The vault balance is not moved to available before betting
 
 **Example:**
 
 ```python
-from stakeapi.exceptions import InsufficientFundsError
+from stakeapi.exceptions import GraphQLError
 
-async with StakeAPI(access_token="...", cf_clearance="...") as client:
+# The bet methods do not raise InsufficientFundsError yet: the site's
+# rejection arrives as a GraphQLError whose message explains why.
+async with StakeAPI(cookie_file="cookie.txt", allow_betting=True) as client:
     try:
-        bet = await client.place_bet({
-            "game_id": "dice",
-            "amount": 9999,  # Way too much
-            "currency": "btc",
-        })
-    except InsufficientFundsError:
+        result = await client.dice_roll(9999, "btc", target=50.5)  # Way too much
+    except GraphQLError as e:
+        print(f"Bet rejected: {e}")
         balance = await client.get_user_balance()
         available_btc = balance["available"].get("btc", 0)
         print(f"Not enough funds. Available BTC: {available_btc:.8f}")
@@ -311,12 +310,8 @@ from stakeapi.exceptions import (
 
 async def safe_place_bet(client, game_id: str, amount: float):
     try:
-        bet = await client.place_bet({
-            "game_id": game_id,
-            "amount": amount,
-            "currency": "btc",
-        })
-        print(f"Bet placed: {bet.id} — {bet.status}")
+        bet = await client.dice_roll(amount, "btc", target=50.5)
+        print(f"Bet placed: {bet.get('id')} — payout {bet.get('payout')}")
         return bet
 
     except AuthenticationError:

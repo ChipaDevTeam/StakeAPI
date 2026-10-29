@@ -47,6 +47,11 @@ class NetworkError(StakeAPIError):
     pass
 
 
+class BettingDisabledError(StakeAPIError):
+    """Raised when a bet method is called on a client created without allow_betting=True."""
+    pass
+
+
 class GameNotFoundError(StakeAPIError):
     """Raised when a requested game is not found."""
     pass

@@ -39,14 +39,14 @@ Complete technical reference for every class, method, and model in StakeAPI.
 | Authenticate with Stake.com | [Getting Started → Authentication](../getting-started/authentication.md) |
 | Get my account balance | [Client → `get_user_balance()`](client.md#get_user_balance) |
 | Browse casino games | [Client → `get_casino_games()`](client.md#get_casino_gamescategorynone) |
-| Place a bet | [Client → `place_bet()`](client.md#place_betbet_data) |
+| Place a bet | [Client → Betting Methods](client.md#betting-methods) |
 | Write a raw GraphQL query | [Endpoints → GraphQL Queries](endpoints.md#class-graphqlqueries) |
 | Handle errors properly | [Exceptions](exceptions.md) |
 | Validate / format amounts | [Utilities](utilities.md) |
 
 ### By class
 
-- **[`StakeAPI`](client.md)** — `get_user_balance()`, `get_casino_games()`, `get_sports_events()`, `place_bet()`, `get_bet_history()`, `get_user_profile()`, `_graphql_request()`
+- **[`StakeAPI`](client.md)** — `get_user_balance()`, `get_casino_games()`, `get_sports_events()`, `dice_roll()`, `crash_bet()`, `place_sport_bet()`, `get_bet_history()`, `get_user_profile()`, `_graphql_request()`
 - **[`AuthManager`](auth-manager.md)** — `set_access_token()`, `is_token_expired()`, `extract_access_token_from_curl()`, `get_cookies()`
 - **[`User`](models.md#class-user)** — `id`, `username`, `verified`, `country`, `currency`
 - **[`Game`](models.md#class-game)** — `name`, `category`, `provider`, `rtp`, `min_bet`, `max_bet`
@@ -83,7 +83,7 @@ Complete technical reference for every class, method, and model in StakeAPI.
 
 | Method | Returns | Description |
 |:-------|:--------|:------------|
-| `place_bet(bet_data)` | `Bet` | Submit a bet |
+| `dice_roll(...)`, `casino_bet(...)`, `crash_bet(...)`, `place_sport_bet(...)`, ... | `dict` | Place a bet (needs `allow_betting=True`) |
 | `get_bet_history(limit=50)` | `List[Bet]` | Recent bet history |
 
 ### `StakeAPI` — Low-level

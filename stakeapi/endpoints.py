@@ -1714,3 +1714,141 @@ class GraphQLSubscriptions:
       }
     }
     """
+
+
+_CRASH_BET_FIELDS = """
+      id
+      user {
+        id
+        name
+      }
+      payoutMultiplier
+      gameId
+      amount
+      payout
+      currency
+      result
+      cashoutAt
+      updatedAt
+"""
+
+_FLIP_BET_FIELDS = """
+      id
+      active
+      payoutMultiplier
+      amountMultiplier
+      amount
+      payout
+      updatedAt
+      currency
+      game
+      state {
+        ... on CasinoGameFlip {
+          currentRound
+          payoutMultiplier
+          playedRounds
+          flips
+        }
+      }
+"""
+
+
+class GraphQLMutations:
+    """GraphQL mutations that place or settle real-money bets.
+
+    UNVALIDATED: these are trimmed from the site's own operations of the
+    same name but have never been sent to the live API. Test them with a
+    small amount on your own account before relying on them.
+    """
+
+    CRASH_BET = """
+    mutation MultiplayerCrashBet($amount: Float!, $currency: CurrencyEnum!, $cashoutAt: Float!) {
+      multiplayerCrashBet(amount: $amount, currency: $currency, cashoutAt: $cashoutAt) {""" + _CRASH_BET_FIELDS + """      }
+    }
+    """
+
+    CRASH_CASHOUT = """
+    mutation MultiplayerCrashCashout {
+      multiplayerCrashCashout {""" + _CRASH_BET_FIELDS + """      }
+    }
+    """
+
+    SLIDE_BETS = """
+    mutation SlideBets($currency: CurrencyEnum!, $identifier: String, $bets: [SlideBetsBetsInput!]!) {
+      slideBets(currency: $currency, identifier: $identifier, bets: $bets) {
+        id
+        payoutMultiplier
+        gameId
+        amount
+        payout
+        currency
+        slideResult: result
+        cashoutAt
+        active
+        createdAt
+      }
+    }
+    """
+
+    FLIP_BET = """
+    mutation FlipBet($amount: Float!, $currency: CurrencyEnum!, $identifier: String, $guesses: [FlipConditionEnum!]!) {
+      flipBet(amount: $amount, currency: $currency, identifier: $identifier, guesses: $guesses) {""" + _FLIP_BET_FIELDS + """      }
+    }
+    """
+
+    FLIP_NEXT = """
+    mutation FlipNext($condition: FlipConditionEnum!) {
+      flipNext(condition: $condition) {""" + _FLIP_BET_FIELDS + """      }
+    }
+    """
+
+    FLIP_CASHOUT = """
+    mutation FlipCashout($identifier: String!) {
+      flipCashout(identifier: $identifier) {""" + _FLIP_BET_FIELDS + """      }
+    }
+    """
+
+    ZOO_BET = """
+    mutation ZooBet($animals: [ZooBetAnimalsInput!]!, $currency: CurrencyEnum!, $identifier: String) {
+      zooBet(animals: $animals, currency: $currency, identifier: $identifier) {
+        id
+        active
+        amount
+        currency
+        payout
+        payoutMultiplier
+        result
+        roundId
+        animalBets {
+          animal
+          amount
+        }
+      }
+    }
+    """
+
+    SPORT_BET = """
+    mutation BetSlipFooter_SportBet($amount: Float!, $currency: CurrencyEnum!, $outcomeIds: [String!]!, $oddsChange: SportOddsChangeEnum!, $betType: SportBetTypeEnum!, $identifier: String) {
+      sportBet(amount: $amount, currency: $currency, outcomeIds: $outcomeIds, oddsChange: $oddsChange, betType: $betType, identifier: $identifier) {
+        id
+        amount
+        currency
+        payoutMultiplier
+        potentialMultiplier
+        outcomes {
+          id
+          odds
+        }
+      }
+    }
+    """
+
+    SPORT_BET_CASHOUT = """
+    mutation SportBetPreview_CashoutSportBet($betId: String!, $multiplier: Float!, $cashoutPercent: Float) {
+      cashoutSportBet(betId: $betId, multiplier: $multiplier, cashoutPercent: $cashoutPercent) {
+        id
+        payout
+        currency
+      }
+    }
+    """

@@ -372,7 +372,7 @@ print(f"Best win:  {stats.biggest_win:.8f}")
 | `User` | `id`, `username`, `verified`, `currency` | `get_user_profile()` |
 | `Game` | `id`, `name`, `category`, `rtp`, `min_bet` | `get_casino_games()`, `get_game_details()` |
 | `SportEvent` | `home_team`, `away_team`, `odds`, `live` | `get_sports_events()` |
-| `Bet` | `amount`, `status`, `potential_payout` | `place_bet()`, `get_bet_history()` |
+| `Bet` | `amount`, `status`, `potential_payout` | `get_bet_history()`, `get_all_house_bets()`, `get_highroller_bets()` |
 | `Transaction` | `type`, `amount`, `currency`, `status` | *(future endpoint)* |
 | `Statistics` | `total_bets`, `win_rate`, `biggest_win` | *(future endpoint)* |
 

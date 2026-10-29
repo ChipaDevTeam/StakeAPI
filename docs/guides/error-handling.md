@@ -101,7 +101,7 @@ Raised when input data doesn't meet requirements:
 
 ```python
 try:
-    bet = await client.place_bet({"amount": -1})
+    bet = await client.dice_roll(-1, "btc", target=50.5)
 except ValidationError as e:
     print(f"Invalid input: {e}")
 ```
@@ -131,13 +131,13 @@ except GameNotFoundError:
 
 ### InsufficientFundsError
 
-Raised when trying to bet more than your balance:
+Reserved for bets larger than your balance. The bet methods do not raise it yet: the site's rejection currently arrives as a `GraphQLError`, so catch that too:
 
 ```python
 try:
-    bet = await client.place_bet({"amount": 1000000})
-except InsufficientFundsError:
-    print("Not enough funds to place this bet")
+    bet = await client.dice_roll(1000000, "btc", target=50.5)
+except (InsufficientFundsError, GraphQLError) as e:
+    print(f"Bet rejected: {e}")
 ```
 
 ## Production Error Handling Pattern

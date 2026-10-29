@@ -26,6 +26,7 @@ from .exceptions import (
     NetworkError,
     GraphQLError,
     PermissionDeniedError,
+    BettingDisabledError,
 )
 from .auth import AuthManager
 from ._version import __version__
@@ -41,5 +42,6 @@ __all__ = [
     "NetworkError",
     "GraphQLError",
     "PermissionDeniedError",
+    "BettingDisabledError",
     "__version__",
 ]

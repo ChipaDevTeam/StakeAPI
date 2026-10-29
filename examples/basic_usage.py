@@ -156,22 +156,13 @@ async def betting_example():
             print(f"Balance: {held[currency]} {currency.upper()}")
             print(f"Demo stake would be: {amount:.8f} {currency.upper()} (~${usd_value:.4f})")
 
-            # Example bet data (modify according to actual API requirements)
-            bet_data = {
-                "game_id": "example_game_id",
-                "bet_type": "win",
-                "amount": f"{amount:.8f}",
-                "currency": currency,
-            }
-
-            # Place bet (commented out for safety)
-            # bet = await client.place_bet(bet_data)
-            # print(f"Bet placed: {bet.id}")
-            # print(f"Amount: ${bet.amount}")
-            # print(f"Potential payout: ${bet.potential_payout}")
-
-            print("Demo betting disabled for safety")
-            print("Uncomment the bet placement code to enable")
+            # Dry run: shows the exact request without sending it. To really
+            # bet, create the client with allow_betting=True and drop dry_run.
+            # The betting methods are not yet tested against the live site.
+            request = await client.dice_roll(
+                amount, currency, target=50.5, condition="above", dry_run=True
+            )
+            print(f"Dice roll request (not sent): {request}")
 
         except StakeAPIError as e:
             print(f"Error placing bet: {e}")

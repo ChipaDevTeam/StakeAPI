@@ -1,6 +1,7 @@
 """Main client for StakeAPI."""
 
 import asyncio
+import uuid
 from typing import Optional, Dict, Any, List
 import aiohttp
 import json
@@ -14,9 +15,10 @@ from .exceptions import (
     GraphQLError,
     PermissionDeniedError,
     ValidationError,
+    BettingDisabledError,
 )
 from .models import User, Game, SportEvent, Bet
-from .endpoints import Endpoints, GraphQLQueries
+from .endpoints import Endpoints, GraphQLQueries, GraphQLMutations
 from .auth import AuthManager
 from .websocket import StakeWebSocket
 
@@ -148,6 +150,7 @@ class StakeAPI:
         rate_limit: int = 10,
         cookie_file: Optional[str] = None,
         cookie_string: Optional[str] = None,
+        allow_betting: bool = False,
     ):
         """
         Initialize the StakeAPI client.
@@ -172,6 +175,9 @@ class StakeAPI:
                 automatically. Takes precedence over cookie_string.
             cookie_string: The same raw cookie string, passed directly instead
                 of via a file.
+            allow_betting: Must be True for any method that places or cashes
+                out a real-money bet. Off by default so a script cannot bet by
+                accident; every bet method also supports dry_run=True.
 
         Raises:
             ValidationError: If base_url is not a valid http(s) URL, or the
@@ -219,6 +225,7 @@ class StakeAPI:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.rate_limit = rate_limit
+        self.allow_betting = allow_betting
         
         self._session: Optional[aiohttp.ClientSession] = None
         self._auth_manager = AuthManager(access_token)
@@ -434,36 +441,9 @@ class StakeAPI:
                 f"Unexpected GraphQL response type: {type(response).__name__} - {response!r}"
             )
 
-        # Check for GraphQL errors
         errors = response.get("errors")
         if errors:
-            error_messages = [error.get("message", "Unknown error") for error in errors]
-            error_types = [
-                error.get("errorType") or error.get("extensions", {}).get("code", "")
-                for error in errors
-            ]
-            joined = ", ".join(error_messages)
-
-            permission_markers = (
-                "not allowed", "unauthorized", "permission", "forbidden",
-                "notauthenticated", "please log in",
-            )
-            if any(
-                marker in msg.lower()
-                for msg in error_messages + error_types
-                for marker in permission_markers
-            ):
-                raise PermissionDeniedError(
-                    f"GraphQL permission error: {joined}. This usually means: "
-                    "1) your access token is invalid or expired — get a fresh one from "
-                    f"{self.base_url} (DevTools → any GraphQL request → 'x-access-token' header); "
-                    "2) your session/cf_clearance cookies were obtained from a different domain "
-                    f"than base_url ({self.base_url}) — token and cookies must all come from the "
-                    "same mirror; or 3) your account lacks permission for this operation.",
-                    errors=errors,
-                )
-
-            raise GraphQLError(f"GraphQL errors: {joined}", errors=errors)
+            self._raise_for_errors(errors)
 
         data = response.get("data")
         if data is None:
@@ -474,6 +454,36 @@ class StakeAPI:
 
         return data
             
+    def _raise_for_errors(self, errors: List[Dict[str, Any]]):
+        """Raise PermissionDeniedError or GraphQLError for an API error list."""
+        error_messages = [error.get("message", "Unknown error") for error in errors]
+        error_types = [
+            error.get("errorType") or error.get("extensions", {}).get("code", "")
+            for error in errors
+        ]
+        joined = ", ".join(error_messages)
+
+        permission_markers = (
+            "not allowed", "unauthorized", "permission", "forbidden",
+            "notauthenticated", "please log in",
+        )
+        if any(
+            marker in msg.lower()
+            for msg in error_messages + error_types
+            for marker in permission_markers
+        ):
+            raise PermissionDeniedError(
+                f"GraphQL permission error: {joined}. This usually means: "
+                "1) your access token is invalid or expired — get a fresh one from "
+                f"{self.base_url} (DevTools → any GraphQL request → 'x-access-token' header); "
+                "2) your session/cf_clearance cookies were obtained from a different domain "
+                f"than base_url ({self.base_url}) — token and cookies must all come from the "
+                "same mirror; or 3) your account lacks permission for this operation.",
+                errors=errors,
+            )
+
+        raise GraphQLError(f"GraphQL errors: {joined}", errors=errors)
+
     # Casino Methods
     async def get_casino_games(
         self,
@@ -934,17 +944,284 @@ class StakeAPI:
     # Betting Methods
     async def place_bet(self, bet_data: Dict[str, Any]) -> Bet:
         """
-        Place a bet.
-
-        Raises:
-            StakeAPIError: Always — stake has no REST API and the GraphQL
-                mutations for placing bets have not been mapped.
+        Not supported: stake has no single bet endpoint. Use the per-game
+        methods instead (dice_roll, casino_bet, crash_bet, slide_bet,
+        flip_bet, zoo_bet, place_sport_bet).
         """
         raise StakeAPIError(
-            "place_bet is not supported yet: stake.com has no REST API and the "
-            "GraphQL mutations for placing bets have not been mapped. "
-            "Working methods: get_user_balance, get_user_profile, get_bet_history, get_all_house_bets, get_currency_rates,"
-            " plus the public casino, sports and promotion methods."
+            "place_bet is not supported: stake has a separate bet call per game. "
+            "Use dice_roll, casino_bet, crash_bet, slide_bet, flip_bet, zoo_bet "
+            "or place_sport_bet (all need StakeAPI(allow_betting=True))."
+        )
+
+    # Real-money betting. UNVALIDATED: built from the site's own code but never
+    # sent to the live API. Every method needs allow_betting=True on the client
+    # and supports dry_run=True, which returns the request instead of sending it.
+    def _check_betting(self, method: str):
+        if not self.allow_betting:
+            raise BettingDisabledError(
+                f"{method} places a real-money bet. Create the client with "
+                "StakeAPI(..., allow_betting=True) to enable betting, or pass "
+                "dry_run=True to see the request without sending it."
+            )
+
+    @staticmethod
+    def _check_amount(amount: float, currency: str):
+        if amount is None or amount < 0:
+            raise ValidationError(f"Bet amount must be zero or positive, got {amount!r}")
+        if not currency or not isinstance(currency, str):
+            raise ValidationError(f"currency must be a currency code such as 'btc', got {currency!r}")
+
+    async def _bet_mutation(
+        self,
+        method: str,
+        query: str,
+        operation_name: str,
+        field: str,
+        variables: Dict[str, Any],
+        dry_run: bool,
+    ) -> Dict[str, Any]:
+        """Send (or with dry_run, describe) a betting GraphQL mutation."""
+        variables = {k: v for k, v in variables.items() if v is not None}
+        if dry_run:
+            return {
+                "dry_run": True,
+                "endpoint": "/_api/graphql",
+                "operation_name": operation_name,
+                "variables": variables,
+            }
+        self._check_betting(method)
+        data = await self._graphql_request(query, variables=variables, operation_name=operation_name)
+        return data.get(field) or {}
+
+    async def casino_bet(
+        self, path: str, variables: Dict[str, Any], dry_run: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Call a Stake Originals bet endpoint directly.
+
+        Stake Originals (Dice, Limbo, Mines, ...) are not GraphQL: the site
+        POSTs the bet variables as JSON to ``/_api/casino/<path>`` and gets
+        back an object keyed by the action, e.g. ``{"diceRoll": {...}}``.
+
+        Known paths from the site's code: "dice/roll", "limbo/bet",
+        "mines/bet", "mines/next". Only Dice's variables are known; for the
+        others, copy them from your browser's DevTools Network tab.
+
+        Args:
+            path: Endpoint path after /_api/casino/, e.g. "limbo/bet"
+            variables: JSON body. An ``identifier`` is added if missing.
+            dry_run: Return the request instead of sending it.
+
+        Returns:
+            The result object (the response's single top-level value).
+        """
+        path = path.strip("/")
+        body = {"identifier": uuid.uuid4().hex, **variables}
+        if dry_run:
+            return {"dry_run": True, "endpoint": f"/_api/casino/{path}", "variables": body}
+        self._check_betting("casino_bet")
+        response = await self._request("POST", f"/_api/casino/{path}", data=body)
+        if not isinstance(response, dict):
+            raise StakeAPIError(f"Unexpected response from /_api/casino/{path}: {response!r}")
+        if response.get("errors"):
+            self._raise_for_errors(response["errors"])
+        results = [v for v in response.values() if isinstance(v, dict)]
+        if len(results) != 1:
+            raise StakeAPIError(f"Unexpected response from /_api/casino/{path}: {response!r}")
+        return results[0]
+
+    async def dice_roll(
+        self,
+        amount: float,
+        currency: str,
+        target: float,
+        condition: str = "above",
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Roll Stake Dice.
+
+        Args:
+            amount: Stake in ``currency`` (0 for a free roll)
+            currency: Currency code, e.g. "btc", "usdt"
+            target: Roll target between 2 and 98
+            condition: "above" or "below" the target
+            dry_run: Return the request instead of sending it
+
+        Returns:
+            The diceRoll result: amount, payout, payoutMultiplier, state, ...
+        """
+        self._check_amount(amount, currency)
+        if condition not in ("above", "below"):
+            raise ValidationError(f"condition must be 'above' or 'below', got {condition!r}")
+        if not 2 <= target <= 98:
+            raise ValidationError(f"Dice target must be between 2 and 98, got {target!r}")
+        return await self.casino_bet(
+            "dice/roll",
+            {"target": target, "condition": condition, "amount": amount, "currency": currency},
+            dry_run=dry_run,
+        )
+
+    async def crash_bet(
+        self, amount: float, currency: str, cashout_at: float, dry_run: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Join the next Crash round with an automatic cashout.
+
+        Args:
+            cashout_at: Auto-cashout multiplier, e.g. 2.0
+        """
+        self._check_amount(amount, currency)
+        if cashout_at is None or cashout_at <= 1:
+            raise ValidationError(f"cashout_at must be above 1, got {cashout_at!r}")
+        return await self._bet_mutation(
+            "crash_bet", GraphQLMutations.CRASH_BET, "MultiplayerCrashBet", "multiplayerCrashBet",
+            {"amount": amount, "currency": currency, "cashoutAt": cashout_at}, dry_run,
+        )
+
+    async def crash_cashout(self, dry_run: bool = False) -> Dict[str, Any]:
+        """Cash out your bet in the running Crash round now."""
+        return await self._bet_mutation(
+            "crash_cashout", GraphQLMutations.CRASH_CASHOUT, "MultiplayerCrashCashout",
+            "multiplayerCrashCashout", {}, dry_run,
+        )
+
+    async def slide_bet(
+        self,
+        currency: str,
+        bets: List[Dict[str, Any]],
+        identifier: Optional[str] = None,
+        dry_run: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """
+        Place bets on the next Slide round.
+
+        Args:
+            bets: SlideBetsBetsInput objects, passed through as given. Their
+                fields are not confirmed; copy one from DevTools first.
+        """
+        self._check_amount(0, currency)
+        result = await self._bet_mutation(
+            "slide_bet", GraphQLMutations.SLIDE_BETS, "SlideBets", "slideBets",
+            {"currency": currency, "bets": bets, "identifier": identifier or uuid.uuid4().hex},
+            dry_run,
+        )
+        return result or []
+
+    async def flip_bet(
+        self,
+        amount: float,
+        currency: str,
+        guesses: List[str],
+        identifier: Optional[str] = None,
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Start a Flip game.
+
+        Args:
+            guesses: FlipConditionEnum values, one per coin (values not
+                confirmed; copy them from DevTools first)
+        """
+        self._check_amount(amount, currency)
+        return await self._bet_mutation(
+            "flip_bet", GraphQLMutations.FLIP_BET, "FlipBet", "flipBet",
+            {"amount": amount, "currency": currency, "guesses": guesses,
+             "identifier": identifier or uuid.uuid4().hex},
+            dry_run,
+        )
+
+    async def flip_next(self, condition: str, dry_run: bool = False) -> Dict[str, Any]:
+        """Flip the next coin in your active Flip game."""
+        return await self._bet_mutation(
+            "flip_next", GraphQLMutations.FLIP_NEXT, "FlipNext", "flipNext",
+            {"condition": condition}, dry_run,
+        )
+
+    async def flip_cashout(self, identifier: str, dry_run: bool = False) -> Dict[str, Any]:
+        """Cash out your active Flip game."""
+        return await self._bet_mutation(
+            "flip_cashout", GraphQLMutations.FLIP_CASHOUT, "FlipCashout", "flipCashout",
+            {"identifier": identifier}, dry_run,
+        )
+
+    async def zoo_bet(
+        self,
+        currency: str,
+        animals: List[Dict[str, Any]],
+        identifier: Optional[str] = None,
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Place bets on the next Zoo round.
+
+        Args:
+            animals: ZooBetAnimalsInput objects, passed through as given
+                (results show ``{"animal", "amount"}`` pairs; confirm the
+                input shape in DevTools first)
+        """
+        self._check_amount(0, currency)
+        return await self._bet_mutation(
+            "zoo_bet", GraphQLMutations.ZOO_BET, "ZooBet", "zooBet",
+            {"currency": currency, "animals": animals, "identifier": identifier or uuid.uuid4().hex},
+            dry_run,
+        )
+
+    async def place_sport_bet(
+        self,
+        amount: float,
+        currency: str,
+        outcome_ids: List[str],
+        odds_change: str,
+        bet_type: str,
+        identifier: Optional[str] = None,
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Place a sports bet (a single, or a multi with several outcomes).
+
+        Args:
+            outcome_ids: Outcome ``id`` values from any fixture's markets
+            odds_change: SportOddsChangeEnum value: which odds moves to accept
+            bet_type: SportBetTypeEnum value
+            dry_run: Return the request instead of sending it
+
+        odds_change and bet_type have no defaults because their valid values
+        are not confirmed; copy them from a bet placed in your browser
+        (DevTools → Network → BetSlipFooter_SportBet).
+        """
+        self._check_amount(amount, currency)
+        if not outcome_ids:
+            raise ValidationError("outcome_ids must contain at least one outcome id")
+        return await self._bet_mutation(
+            "place_sport_bet", GraphQLMutations.SPORT_BET, "BetSlipFooter_SportBet", "sportBet",
+            {"amount": amount, "currency": currency, "outcomeIds": list(outcome_ids),
+             "oddsChange": odds_change, "betType": bet_type,
+             "identifier": identifier or uuid.uuid4().hex},
+            dry_run,
+        )
+
+    async def cashout_sport_bet(
+        self,
+        bet_id: str,
+        multiplier: float,
+        cashout_percent: Optional[float] = None,
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Cash out an open sports bet.
+
+        Args:
+            bet_id: The bet's id (from get_active_sport_bets)
+            multiplier: The cashout multiplier currently offered for the bet
+            cashout_percent: Cash out only part of the bet
+        """
+        return await self._bet_mutation(
+            "cashout_sport_bet", GraphQLMutations.SPORT_BET_CASHOUT,
+            "SportBetPreview_CashoutSportBet", "cashoutSportBet",
+            {"betId": bet_id, "multiplier": multiplier, "cashoutPercent": cashout_percent},
+            dry_run,
         )
 
     async def get_bet_history(
