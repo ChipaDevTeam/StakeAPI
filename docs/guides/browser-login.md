@@ -21,6 +21,9 @@ Plain HTTP calls from Python are often refused with `403 Forbidden` by the site'
 
 Nothing is typed for you, and the library adds no stealth or anti-detection tricks. The automated Chrome identifies itself as automated, and if the site refuses it, requests are refused too.
 
+{: .highlight }
+> **Recommended:** if you are logged in to the site in your normal Chrome, use `import_cookies_from="chrome"` ([below](#log-in-automatically-with-your-own-chrome)). The automated window is logged in at once, with no password, captcha or Google sign-in. Logging in by hand inside the automated window can fail: the site's captcha may not load there, and Google refuses sign-in in automated browsers ("This browser or app may not be secure").
+
 ## Install
 
 ```bash

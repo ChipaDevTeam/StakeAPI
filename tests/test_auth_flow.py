@@ -132,6 +132,7 @@ async def test_403_from_cloudflare_block_page(base_url):
             await client._request("GET", "/cf")
     assert "No cookies were sent" in str(err.value)
     assert "user_agent=" in str(err.value)
+    assert 'import_cookies_from="chrome"' in str(err.value)
 
 
 @pytest.mark.asyncio
@@ -142,7 +143,7 @@ async def test_403_from_kasada(base_url):
         with pytest.raises(StakeAPIError, match="Kasada") as err:
             await client._request("GET", "/kasada")
     assert "No cookies were sent" not in str(err.value)
-    assert "no cf_clearance" not in str(err.value).lower()
+    assert "your cookies have no cf_clearance" not in str(err.value).lower()
 
 
 @pytest.mark.asyncio
@@ -150,7 +151,8 @@ async def test_403_without_cf_clearance_says_so(base_url):
     async with StakeAPI(base_url=base_url, cookie_string="session=abc") as client:
         with pytest.raises(StakeAPIError, match="bot protection") as err:
             await client._request("GET", "/plain")
-    assert "no cf_clearance" in str(err.value)
+    assert "some sites issue no cf_clearance" in str(err.value)
+    assert 'import_cookies_from="chrome"' in str(err.value)
     assert "does not work around" in str(err.value)
 
 

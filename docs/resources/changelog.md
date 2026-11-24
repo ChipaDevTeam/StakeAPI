@@ -21,6 +21,11 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- The 403 message no longer tells you to copy a `cf_clearance` cookie (some sites never issue one). It now points to `StakeAPI.with_browser(..., import_cookies_from="chrome")`, the way that works through the bot protection
+- The browser-login guide leads with `import_cookies_from="chrome"` and explains why logging in by hand in the automated window can fail
+
 ---
 
 ## [0.2.0] — 2026-11-24

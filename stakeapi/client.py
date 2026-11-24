@@ -545,7 +545,9 @@ class StakeAPI:
                 "The request was made from the automated Chrome window and was "
                 "still refused: the site may block automated browsers or this "
                 "network. Make sure the window shows the site logged in, or try "
-                "once in a normal Chrome. This library adds no stealth."
+                "once in a normal Chrome. Log in by hand, or pass "
+                'import_cookies_from="chrome" to reuse your own Chrome login. '
+                "This library adds no stealth."
             ]
             return StakeAPIError(
                 f"403 Forbidden from {self.base_url}: blocked by {source}. "
@@ -558,25 +560,21 @@ class StakeAPI:
                 "No cookies were sent. Pass cookie_file= with the cookies of a "
                 f"browser that is logged in to {self.base_url}."
             )
-        elif (
-            "cf_clearance" not in (self._cookie_header or "") and not self.cf_clearance
-        ):
-            hints.append(
-                "Your cookies have no cf_clearance. If the block is Cloudflare's, "
-                "copy it from DevTools → Application → Cookies."
-            )
         hints.append(
-            "Cookies must come from the SAME domain as base_url, and some are "
-            "short-lived (re-copy them if they are old)."
+            "Plain Python requests are often refused even with valid cookies, "
+            "because the bot protection checks the browser itself (some sites "
+            "issue no cf_clearance cookie at all, so there may be nothing more "
+            "to copy). The reliable way is StakeAPI.with_browser(base_url, "
+            'import_cookies_from="chrome"): it sends requests from a real Chrome '
+            "window and logs in with the session of your own Chrome. This "
+            "library does not work around bot protection."
         )
         hints.append(
-            "The protection also checks that the request looks like the browser "
-            "that earned the cookies: use the same network, and pass "
-            f"user_agent= with that browser's exact User-Agent (now: "
-            f"{self.user_agent or 'library default'!r}). A script can still be "
-            "refused even with valid cookies. Use StakeAPI.with_browser() to send "
-            "requests from a real logged-in Chrome window; this library does not "
-            "work around bot protection."
+            "Cookies must come from the SAME domain as base_url, and some are "
+            "short-lived (re-copy them if they are old). If you stay on plain "
+            "requests, use the same network and pass user_agent= with that "
+            "browser's exact User-Agent (now: "
+            f"{self.user_agent or 'library default'!r})."
         )
         return StakeAPIError(
             f"403 Forbidden from {self.base_url}: blocked by {source}. "
