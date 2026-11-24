@@ -9,6 +9,7 @@ get_user_stats() works without logging in.
 import asyncio
 
 from basic_usage import make_client
+
 from stakeapi.exceptions import PermissionDeniedError, StakeAPIError
 
 
@@ -27,14 +28,24 @@ async def main():
             print("Claimable bonuses:", await client.get_claimable_bonuses())
 
             seeds = await client.get_seed_pair()
-            print(f"Server seed hash {seeds['server_seed_hash']}, nonce {seeds['nonce']}")
+            print(
+                f"Server seed hash {seeds['server_seed_hash']}, nonce {seeds['nonce']}"
+            )
 
             print("Top games this month:")
-            for stat in await client.get_game_statistics(period="month", sort="wagered", limit=5):
-                print(f"  {stat['game']['name']}: {stat['betCount']} bets, profit {stat['profitValue']}")
+            for stat in await client.get_game_statistics(
+                period="month", sort="wagered", limit=5
+            ):
+                print(
+                    f"  {stat['game']['name']}: {stat['betCount']} bets, "
+                    f"profit {stat['profitValue']}"
+                )
 
             for bet in await client.get_sport_bet_history(limit=3):
-                print(f"Sport bet {bet['amount']} {bet['currency']} @ {bet['potentialMultiplier']}x")
+                print(
+                    f"Sport bet {bet['amount']} {bet['currency']} "
+                    f"@ {bet['potentialMultiplier']}x"
+                )
         except PermissionDeniedError as e:
             print(f"Not logged in: {e}")
         except StakeAPIError as e:

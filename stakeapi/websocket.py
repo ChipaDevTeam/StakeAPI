@@ -1,9 +1,12 @@
 """Live data over stake's GraphQL WebSocket (/_api/websockets)."""
 
+from __future__ import annotations
+
 import asyncio
 import itertools
 import json
-from typing import Any, AsyncIterator, Dict, List, Optional, TYPE_CHECKING
+from types import TracebackType
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Type
 
 import aiohttp
 
@@ -45,29 +48,37 @@ class StakeWebSocket:
         self._client = client
         self._language = language
         self._session: Optional[aiohttp.ClientSession] = None
-        self._ws: Optional[aiohttp.ClientWebSocketResponse] = None
-        self._reader: Optional[asyncio.Task] = None
-        self._queues: Dict[str, asyncio.Queue] = {}
+        self._ws: Optional[aiohttp.ClientWebSocketResponse[bool]] = None
+        self._reader: Optional[asyncio.Task[None]] = None
+        self._queues: Dict[str, asyncio.Queue[Any]] = {}
         self._ids = itertools.count(1)
 
     @property
     def url(self) -> str:
         """WebSocket URL derived from the client's base_url."""
         base = self._client.base_url.rstrip("/")
-        return base.replace("https://", "wss://", 1).replace("http://", "ws://", 1) + "/_api/websockets"
+        return (
+            base.replace("https://", "wss://", 1).replace("http://", "ws://", 1)
+            + "/_api/websockets"
+        )
 
     @property
     def connected(self) -> bool:
         return self._ws is not None and not self._ws.closed
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "StakeWebSocket":
         await self.connect()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
         await self.close()
 
-    async def connect(self, ack_timeout: float = 10.0):
+    async def connect(self, ack_timeout: float = 10.0) -> None:
         """
         Open the connection and complete the graphql-ws handshake.
 
@@ -82,14 +93,15 @@ class StakeWebSocket:
         # No total timeout: the connection is meant to stay open
         self._session = aiohttp.ClientSession(headers=headers, cookies=cookies or None)
         try:
-            self._ws = await self._session.ws_connect(
+            ws = await self._session.ws_connect(
                 self.url, protocols=(PROTOCOL,), heartbeat=None
             )
+            self._ws = ws
             params: Dict[str, Any] = {"language": self._language}
             if self._client.access_token:
                 params["accessToken"] = self._client.access_token
-            await self._ws.send_json({"type": "connection_init", "payload": params})
-            ack = await self._ws.receive(timeout=ack_timeout)
+            await ws.send_json({"type": "connection_init", "payload": params})
+            ack = await ws.receive(timeout=ack_timeout)
         except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             await self.close()
             raise NetworkError(
@@ -101,11 +113,13 @@ class StakeWebSocket:
         message = _parse(ack)
         if not message or message.get("type") != "connection_ack":
             await self.close()
-            raise NetworkError(f"WebSocket handshake was not acknowledged: {ack.data!r}")
+            raise NetworkError(
+                f"WebSocket handshake was not acknowledged: {ack.data!r}"
+            )
 
         self._reader = asyncio.create_task(self._read_loop())
 
-    async def close(self):
+    async def close(self) -> None:
         """Close the connection and end every open subscription."""
         if self._reader:
             self._reader.cancel()
@@ -136,16 +150,14 @@ class StakeWebSocket:
             GraphQLError: The server rejected the subscription.
             NetworkError: The connection dropped.
         """
-        if not self.connected:
-            raise NetworkError("WebSocket is not connected — call connect() first")
-
+        ws = self._socket()
         sub_id = str(next(self._ids))
-        queue: asyncio.Queue = asyncio.Queue()
+        queue: asyncio.Queue[Any] = asyncio.Queue()
         self._queues[sub_id] = queue
         payload: Dict[str, Any] = {"query": query}
         if variables:
             payload["variables"] = variables
-        await self._ws.send_json({"id": sub_id, "type": "subscribe", "payload": payload})
+        await ws.send_json({"id": sub_id, "type": "subscribe", "payload": payload})
 
         try:
             while True:
@@ -157,49 +169,61 @@ class StakeWebSocket:
                 yield item
         finally:
             self._queues.pop(sub_id, None)
-            if self.connected:
+            if self.connected and self._ws is not None:
                 try:
                     await self._ws.send_json({"id": sub_id, "type": "complete"})
                 except (aiohttp.ClientError, ConnectionError, RuntimeError):
                     pass
 
-    async def _read_loop(self):
+    def _socket(self) -> aiohttp.ClientWebSocketResponse[bool]:
+        """The open connection, or NetworkError if there is none."""
+        if self._ws is None or self._ws.closed:
+            raise NetworkError("WebSocket is not connected — call connect() first")
+        return self._ws
+
+    async def _read_loop(self) -> None:
         error: Exception = NetworkError("WebSocket connection closed by server")
         try:
-            async for msg in self._ws:
+            ws = self._socket()
+            async for msg in ws:
                 if msg.type != aiohttp.WSMsgType.TEXT:
                     if msg.type == aiohttp.WSMsgType.ERROR:
-                        error = NetworkError(f"WebSocket error: {self._ws.exception()}")
+                        error = NetworkError(f"WebSocket error: {ws.exception()}")
                     continue
                 message = _parse(msg)
                 if message:
                     await self._dispatch(message)
-            if self._ws.close_code not in (None, 1000):
-                error = NetworkError(f"WebSocket closed with code {self._ws.close_code}")
+            if ws.close_code not in (None, 1000):
+                error = NetworkError(f"WebSocket closed with code {ws.close_code}")
         except asyncio.CancelledError:
             raise
         except Exception as e:
             error = NetworkError(f"WebSocket read failed: {e}")
         self._fail_all(error)
 
-    async def _dispatch(self, message: Dict[str, Any]):
+    async def _dispatch(self, message: Dict[str, Any]) -> None:
         kind = message.get("type")
         if kind == "ping":
-            await self._ws.send_json({"type": "pong"})
+            await self._socket().send_json({"type": "pong"})
             return
-        queue = self._queues.get(message.get("id"))
+        queue = self._queues.get(str(message.get("id")))
         if queue is None:
             return
         payload = message.get("payload")
         if kind == "next":
             errors = (payload or {}).get("errors")
-            queue.put_nowait(_subscription_error(errors) if errors else (payload or {}).get("data") or {})
+            queue.put_nowait(
+                _subscription_error(errors)
+                if errors
+                else (payload or {}).get("data") or {}
+            )
         elif kind == "error":
-            queue.put_nowait(_subscription_error(payload if isinstance(payload, list) else [payload]))
+            errors = payload if isinstance(payload, list) else [payload or {}]
+            queue.put_nowait(_subscription_error(errors))
         elif kind == "complete":
             queue.put_nowait(_COMPLETE)
 
-    def _fail_all(self, error: Exception):
+    def _fail_all(self, error: Exception) -> None:
         for queue in self._queues.values():
             queue.put_nowait(error)
 
@@ -236,14 +260,18 @@ class StakeWebSocket:
 
     def highroller_bets(self) -> AsyncIterator[Dict[str, Any]]:
         """High-roller casino bets as they settle."""
-        return self._field(GraphQLSubscriptions.HIGHROLLER_HOUSE_BETS, "highrollerHouseBets")
+        return self._field(
+            GraphQLSubscriptions.HIGHROLLER_HOUSE_BETS, "highrollerHouseBets"
+        )
 
     def all_sport_bets(self) -> AsyncIterator[Dict[str, Any]]:
         """Public sports bets as they are placed."""
         return self._field(GraphQLSubscriptions.ALL_SPORT_BETS, "allSportBets")
 
     # Sports
-    def sport_market(self, market_id: str, provider: str) -> AsyncIterator[Dict[str, Any]]:
+    def sport_market(
+        self, market_id: str, provider: str
+    ) -> AsyncIterator[Dict[str, Any]]:
         """
         Live odds for one market. Yields the market each time it changes.
 
@@ -257,7 +285,9 @@ class StakeWebSocket:
             {"marketId": market_id, "provider": provider},
         )
 
-    def sport_fixture(self, fixture_id: str, provider: str) -> AsyncIterator[Dict[str, Any]]:
+    def sport_fixture(
+        self, fixture_id: str, provider: str
+    ) -> AsyncIterator[Dict[str, Any]]:
         """Live status and score for one fixture. Yields it each time it changes."""
         return self._field(
             GraphQLSubscriptions.SPORT_FIXTURE,
@@ -270,10 +300,14 @@ class StakeWebSocket:
         """Race start, end and status changes."""
         return self._field(GraphQLSubscriptions.RACE_STATUS, "raceStatus")
 
-    def race_leaderboard(self, race_id: str, limit: int = 10) -> AsyncIterator[Dict[str, Any]]:
+    def race_leaderboard(
+        self, race_id: str, limit: int = 10
+    ) -> AsyncIterator[Dict[str, Any]]:
         """Leaderboard updates for one race (ids from get_active_races)."""
         return self._field(
-            GraphQLSubscriptions.RACE_LEADERBOARD, "race", {"raceId": race_id, "limit": limit}
+            GraphQLSubscriptions.RACE_LEADERBOARD,
+            "race",
+            {"raceId": race_id, "limit": limit},
         )
 
     def chat_messages(self, chat_id: str) -> AsyncIterator[Dict[str, Any]]:
@@ -286,14 +320,16 @@ class StakeWebSocket:
         """Fires when the logged-in session expires. Requires an access token."""
         return self._field(GraphQLSubscriptions.SESSION_EXPIRED, "sessionExpired")
 
-    async def _unwrap_event(self, query: str, field: str) -> AsyncIterator[Dict[str, Any]]:
+    async def _unwrap_event(
+        self, query: str, field: str
+    ) -> AsyncIterator[Dict[str, Any]]:
         async for data in self.subscribe(query):
             event = (data.get(field) or {}).get("event")
             if event:
                 yield event
 
 
-def _parse(msg: aiohttp.WSMessage) -> Optional[Dict[str, Any]]:
+def _parse(msg: Any) -> Optional[Dict[str, Any]]:
     if msg.type != aiohttp.WSMsgType.TEXT:
         return None
     try:
@@ -304,7 +340,9 @@ def _parse(msg: aiohttp.WSMessage) -> Optional[Dict[str, Any]]:
 
 
 def _subscription_error(errors: List[Dict[str, Any]]) -> StakeAPIError:
-    errors = [e for e in errors if isinstance(e, dict)] or [{"message": "Unknown error"}]
+    errors = [e for e in errors if isinstance(e, dict)] or [
+        {"message": "Unknown error"}
+    ]
     joined = ", ".join(e.get("message", "Unknown error") for e in errors)
     if any(e.get("errorType") == "notAuthenticated" for e in errors):
         return PermissionDeniedError(

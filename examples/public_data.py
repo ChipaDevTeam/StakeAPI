@@ -9,12 +9,13 @@ pass Cloudflare, so set up cookies the same way as basic_usage.py
 import asyncio
 
 from basic_usage import make_client
+
 from stakeapi.exceptions import StakeAPIError
 
 
 async def casino_examples(client):
     print("=== Casino ===")
-    for game in (await client.get_casino_games("stake-originals", limit=5)):
+    for game in await client.get_casino_games("stake-originals", limit=5):
         print(f"  {game.name:<12} RTP {game.rtp}%  players: {game.player_count}")
 
     dice = await client.get_game_details("stake-dice")

@@ -1,16 +1,19 @@
 import asyncio
-from stakeapi import (
-    StakeAPI,
-    AuthenticationError,
-    PermissionDeniedError,
-    NetworkError,
-    RateLimitError,
-    StakeAPIError,
-)
-import dotenv
 import os
 
+import dotenv
+
+from stakeapi import (
+    AuthenticationError,
+    NetworkError,
+    PermissionDeniedError,
+    RateLimitError,
+    StakeAPI,
+    StakeAPIError,
+)
+
 dotenv.load_dotenv()
+
 
 async def main():
     # Replace with your actual access token

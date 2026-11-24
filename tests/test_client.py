@@ -1,11 +1,12 @@
 """Tests for StakeAPI client."""
 
-import pytest
 from unittest.mock import patch
+
+import pytest
+
 from stakeapi import StakeAPI
 from stakeapi.exceptions import AuthenticationError, RateLimitError, StakeAPIError
-from stakeapi.models import User, Game, SportEvent
-
+from stakeapi.models import Game, SportEvent, User
 
 # Trimmed copies of real responses from the live API
 KURATOR_GAME = {
@@ -17,10 +18,28 @@ KURATOR_GAME = {
     "edge": 0.01,
     "thumbnailUrl": "https://mediumrare.imgix.net/edfa399c",
     "playerCount": 2765,
-    "providerGroup": {"id": "dd7f", "name": "Stake Originals", "slug": "stake-originals"},
+    "providerGroup": {
+        "id": "dd7f",
+        "name": "Stake Originals",
+        "slug": "stake-originals",
+    },
     "groupGames": [
-        {"group": {"id": "598f", "slug": "dice", "translation": "Dice", "type": "theme"}},
-        {"group": {"id": "ee92", "slug": "provably-fair", "translation": "Provably Fair", "type": "category"}},
+        {
+            "group": {
+                "id": "598f",
+                "slug": "dice",
+                "translation": "Dice",
+                "type": "theme",
+            }
+        },
+        {
+            "group": {
+                "id": "ee92",
+                "slug": "provably-fair",
+                "translation": "Provably Fair",
+                "type": "category",
+            }
+        },
     ],
 }
 
@@ -36,10 +55,26 @@ FIXTURE = {
             {"name": "van Schie, Jimmy", "qualifier": "away"},
         ],
     },
-    "groups": [{"templates": [{"markets": [{"outcomes": [
-        {"name": "Smith, Michael", "odds": 1.4, "active": True},
-        {"name": "van Schie, Jimmy", "odds": 2.85, "active": True},
-    ]}]}]}],
+    "groups": [
+        {
+            "templates": [
+                {
+                    "markets": [
+                        {
+                            "outcomes": [
+                                {"name": "Smith, Michael", "odds": 1.4, "active": True},
+                                {
+                                    "name": "van Schie, Jimmy",
+                                    "odds": 2.85,
+                                    "active": True,
+                                },
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
 }
 
 
@@ -75,14 +110,18 @@ class TestStakeAPI:
     @pytest.mark.asyncio
     async def test_authentication_error(self, stake_client):
         """Test authentication error handling."""
-        with patch.object(stake_client, '_request', side_effect=AuthenticationError("Invalid token")):
+        with patch.object(
+            stake_client, "_request", side_effect=AuthenticationError("Invalid token")
+        ):
             with pytest.raises(AuthenticationError):
                 await stake_client.get_user_profile()
 
     @pytest.mark.asyncio
     async def test_rate_limit_error(self, stake_client):
         """Test rate limit error handling."""
-        with patch.object(stake_client, '_request', side_effect=RateLimitError("Rate limit exceeded")):
+        with patch.object(
+            stake_client, "_request", side_effect=RateLimitError("Rate limit exceeded")
+        ):
             with pytest.raises(RateLimitError):
                 await stake_client.get_casino_games()
 
@@ -90,7 +129,9 @@ class TestStakeAPI:
     async def test_get_casino_games(self, stake_client):
         """Test getting casino games from a lobby group."""
         data = {"slugKuratorGroup": {"groupGamesList": [{"game": KURATOR_GAME}]}}
-        with patch.object(stake_client, '_graphql_request', return_value=data) as mock_gql:
+        with patch.object(
+            stake_client, "_graphql_request", return_value=data
+        ) as mock_gql:
             games = await stake_client.get_casino_games(category="stake-originals")
 
         assert mock_gql.call_args.kwargs["variables"]["slug"] == "stake-originals"
@@ -106,25 +147,36 @@ class TestStakeAPI:
     @pytest.mark.asyncio
     async def test_get_casino_games_unknown_group(self, stake_client):
         """Test an unknown lobby group raises."""
-        with patch.object(stake_client, '_graphql_request', return_value={"slugKuratorGroup": None}):
+        with patch.object(
+            stake_client, "_graphql_request", return_value={"slugKuratorGroup": None}
+        ):
             with pytest.raises(StakeAPIError):
                 await stake_client.get_casino_games(category="nope")
 
     @pytest.mark.asyncio
     async def test_get_game_details(self, stake_client):
         """Test getting one game by slug."""
-        with patch.object(stake_client, '_graphql_request', return_value={"slugKuratorGame": KURATOR_GAME}):
+        with patch.object(
+            stake_client,
+            "_graphql_request",
+            return_value={"slugKuratorGame": KURATOR_GAME},
+        ):
             game = await stake_client.get_game_details("stake-dice")
         assert game.name == "dice"
 
     @pytest.mark.asyncio
     async def test_get_user_profile(self, stake_client):
         """Test getting user profile."""
-        data = {"user": {
-            "id": "u1", "name": "testuser", "email": "t@example.com",
-            "hasEmailVerified": True, "createdAt": "Sat, 11 Jul 2026 07:41:10 GMT",
-        }}
-        with patch.object(stake_client, '_graphql_request', return_value=data):
+        data = {
+            "user": {
+                "id": "u1",
+                "name": "testuser",
+                "email": "t@example.com",
+                "hasEmailVerified": True,
+                "createdAt": "Sat, 11 Jul 2026 07:41:10 GMT",
+            }
+        }
+        with patch.object(stake_client, "_graphql_request", return_value=data):
             user = await stake_client.get_user_profile()
 
         assert isinstance(user, User)
@@ -134,11 +186,15 @@ class TestStakeAPI:
     @pytest.mark.asyncio
     async def test_get_sports_events(self, stake_client):
         """Test sports events are mapped from the SportIndex query."""
-        data = {"slugSport": {
-            "name": "Darts",
-            "firstTournament": [{"name": "PDC Players Championship", "fixtureList": [FIXTURE]}],
-        }}
-        with patch.object(stake_client, '_graphql_request', return_value=data):
+        data = {
+            "slugSport": {
+                "name": "Darts",
+                "firstTournament": [
+                    {"name": "PDC Players Championship", "fixtureList": [FIXTURE]}
+                ],
+            }
+        }
+        with patch.object(stake_client, "_graphql_request", return_value=data):
             events = await stake_client.get_sports_events("darts")
 
         assert len(events) == 1
@@ -153,7 +209,7 @@ class TestStakeAPI:
     async def test_get_fixtures(self, stake_client):
         """Test fixture list returns the count and fixtures."""
         data = {"fixtureCount": 1723, "fixtureList": [FIXTURE]}
-        with patch.object(stake_client, '_graphql_request', return_value=data):
+        with patch.object(stake_client, "_graphql_request", return_value=data):
             result = await stake_client.get_fixtures(limit=1)
         assert result == {"count": 1723, "fixtures": [FIXTURE]}
 
@@ -161,18 +217,26 @@ class TestStakeAPI:
     async def test_search_sports_skips_empty_results(self, stake_client):
         """Test non-fixture search results are dropped."""
         data = {"sportFixtureQuery": [{"fixture": FIXTURE}, {"fixture": {}}]}
-        with patch.object(stake_client, '_graphql_request', return_value=data):
+        with patch.object(stake_client, "_graphql_request", return_value=data):
             fixtures = await stake_client.search_sports("smith")
         assert fixtures == [FIXTURE]
 
     @pytest.mark.asyncio
     async def test_get_currency_limits(self, stake_client):
         """Test currency limits are parsed to floats."""
-        data = {"info": {"currencies": [
-            {"name": "btc", "betMax": {"value": "100"}, "betMaxProfit": {"value": "10"}},
-            {"name": "usdt", "betMax": None, "betMaxProfit": {"value": "1000"}},
-        ]}}
-        with patch.object(stake_client, '_graphql_request', return_value=data):
+        data = {
+            "info": {
+                "currencies": [
+                    {
+                        "name": "btc",
+                        "betMax": {"value": "100"},
+                        "betMaxProfit": {"value": "10"},
+                    },
+                    {"name": "usdt", "betMax": None, "betMaxProfit": {"value": "1000"}},
+                ]
+            }
+        }
+        with patch.object(stake_client, "_graphql_request", return_value=data):
             limits = await stake_client.get_currency_limits()
         assert limits == {
             "btc": {"bet_max": 100.0, "bet_max_profit": 10.0},
@@ -182,12 +246,14 @@ class TestStakeAPI:
     @pytest.mark.asyncio
     async def test_get_game_payouts(self, stake_client):
         """Test payout tables are split per game."""
-        data = {"info": {
-            "kenoPayouts": [{"payouts": [0, 3.96], "risk": "classic"}],
-            "plinkoPayouts": [{"payouts": [5.6, 2.1], "rows": 8, "risk": "low"}],
-            "wheelPayouts": None,
-        }}
-        with patch.object(stake_client, '_graphql_request', return_value=data):
+        data = {
+            "info": {
+                "kenoPayouts": [{"payouts": [0, 3.96], "risk": "classic"}],
+                "plinkoPayouts": [{"payouts": [5.6, 2.1], "rows": 8, "risk": "low"}],
+                "wheelPayouts": None,
+            }
+        }
+        with patch.object(stake_client, "_graphql_request", return_value=data):
             payouts = await stake_client.get_game_payouts()
         assert payouts["keno"][0]["risk"] == "classic"
         assert payouts["plinko"][0]["rows"] == 8

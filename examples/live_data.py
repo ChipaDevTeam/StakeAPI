@@ -10,6 +10,7 @@ in .env). Stop with Ctrl+C.
 import asyncio
 
 from basic_usage import make_client
+
 from stakeapi.exceptions import StakeAPIError
 
 

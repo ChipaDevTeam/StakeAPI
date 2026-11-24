@@ -318,7 +318,7 @@ Clean a game name string for safe use in filenames, URLs, database keys, or log 
 from stakeapi.utils import sanitize_game_name
 
 sanitize_game_name("Plinko")                         # "Plinko"
-sanitize_game_name("Dragon Tiger 🐉")                # "Dragon Tiger "  (emoji removed)
+sanitize_game_name("Dragon Tiger 🐉")                # "Dragon Tiger"  (emoji removed)
 sanitize_game_name("Blackjack (Classic)")             # "Blackjack Classic"
 sanitize_game_name("Super   Slots!!!")                # "Super Slots"
 sanitize_game_name("  Baccarat  ")                   # "Baccarat"

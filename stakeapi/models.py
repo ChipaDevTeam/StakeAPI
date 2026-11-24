@@ -1,14 +1,15 @@
 """Data models for StakeAPI."""
 
-from typing import Dict, Any, Optional, List
 from datetime import datetime
-from pydantic import BaseModel, Field
 from decimal import Decimal
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, Field
 
 
 class User(BaseModel):
     """User model."""
-    
+
     id: str
     username: str
     email: Optional[str] = None
@@ -16,7 +17,7 @@ class User(BaseModel):
     created_at: datetime
     country: Optional[str] = None
     currency: str = "USD"
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "User":
         """Create User from dictionary."""
@@ -25,7 +26,7 @@ class User(BaseModel):
 
 class Game(BaseModel):
     """Casino game model."""
-    
+
     id: str
     name: str
     slug: Optional[str] = None
@@ -39,7 +40,7 @@ class Game(BaseModel):
     features: List[str] = Field(default_factory=list)
     thumbnail_url: Optional[str] = None
     player_count: Optional[int] = None
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Game":
         """Create Game from dictionary."""
@@ -48,7 +49,7 @@ class Game(BaseModel):
 
 class SportEvent(BaseModel):
     """Sports event model."""
-    
+
     id: str
     sport: str
     league: str
@@ -58,7 +59,7 @@ class SportEvent(BaseModel):
     status: str
     odds: Dict[str, float] = Field(default_factory=dict)
     live: bool = False
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SportEvent":
         """Create SportEvent from dictionary."""
@@ -67,7 +68,7 @@ class SportEvent(BaseModel):
 
 class Bet(BaseModel):
     """Bet model."""
-    
+
     id: str
     user_id: str
     game_id: Optional[str] = None
@@ -81,7 +82,7 @@ class Bet(BaseModel):
     status: str  # pending, won, lost, cancelled
     placed_at: datetime
     settled_at: Optional[datetime] = None
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Bet":
         """Create Bet from dictionary."""
@@ -90,7 +91,7 @@ class Bet(BaseModel):
 
 class Transaction(BaseModel):
     """Transaction model."""
-    
+
     id: str
     user_id: str
     type: str  # deposit, withdrawal, bet, win
@@ -99,7 +100,7 @@ class Transaction(BaseModel):
     status: str
     timestamp: datetime
     description: Optional[str] = None
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Transaction":
         """Create Transaction from dictionary."""
@@ -108,7 +109,7 @@ class Transaction(BaseModel):
 
 class Statistics(BaseModel):
     """User statistics model."""
-    
+
     total_bets: int = 0
     total_wagered: Decimal = Field(default=Decimal("0"))
     total_won: Decimal = Field(default=Decimal("0"))
@@ -116,7 +117,7 @@ class Statistics(BaseModel):
     win_rate: float = 0.0
     biggest_win: Decimal = Field(default=Decimal("0"))
     favorite_game: Optional[str] = None
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Statistics":
         """Create Statistics from dictionary."""

@@ -1,0 +1,9 @@
+[flake8]
+max-line-length = 88
+# E203/W503 conflict with black's formatting
+extend-ignore = E203, W503
+per-file-ignores =
+    # GraphQL documents: one operation signature per line reads best
+    stakeapi/endpoints.py: E501
+    # Holds a sample curl command copied verbatim from the browser
+    examples/balance_example.py: E501

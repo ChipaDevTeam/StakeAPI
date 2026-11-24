@@ -3,46 +3,46 @@
 
 class Endpoints:
     """API endpoint constants."""
-    
+
     # GraphQL endpoint
     GRAPHQL = "/_api/graphql"
-    
+
     # Legacy REST endpoints (if any still exist)
     API_BASE = "/api/v1"
-    
+
     # Authentication
     AUTH_LOGIN = f"{API_BASE}/auth/login"
     AUTH_LOGOUT = f"{API_BASE}/auth/logout"
     AUTH_REFRESH = f"{API_BASE}/auth/refresh"
-    
+
     # User endpoints
     USER_PROFILE = f"{API_BASE}/user/profile"
     USER_BALANCE = f"{API_BASE}/user/balance"
     USER_STATISTICS = f"{API_BASE}/user/statistics"
     USER_TRANSACTIONS = f"{API_BASE}/user/transactions"
-    
+
     # Casino endpoints
     CASINO_GAMES = f"{API_BASE}/casino/games"
     CASINO_GAME_DETAILS = f"{API_BASE}/casino/games/{{game_id}}"
     CASINO_PROVIDERS = f"{API_BASE}/casino/providers"
     CASINO_CATEGORIES = f"{API_BASE}/casino/categories"
-    
+
     # Sports endpoints
     SPORTS_EVENTS = f"{API_BASE}/sports/events"
     SPORTS_EVENT_DETAILS = f"{API_BASE}/sports/events/{{event_id}}"
     SPORTS_LEAGUES = f"{API_BASE}/sports/leagues"
     SPORTS_ODDS = f"{API_BASE}/sports/odds"
-    
+
     # Betting endpoints
     PLACE_BET = f"{API_BASE}/bets/place"
     BET_HISTORY = f"{API_BASE}/bets/history"
     BET_DETAILS = f"{API_BASE}/bets/{{bet_id}}"
     CANCEL_BET = f"{API_BASE}/bets/{{bet_id}}/cancel"
-    
+
     # Live endpoints
     LIVE_GAMES = f"{API_BASE}/live/games"
     LIVE_EVENTS = f"{API_BASE}/live/events"
-    
+
     # Promotions
     PROMOTIONS = f"{API_BASE}/promotions"
     PROMOTION_DETAILS = f"{API_BASE}/promotions/{{promo_id}}"
@@ -199,7 +199,7 @@ _SPORT_BET_FRAGMENT = """
 
 class GraphQLQueries:
     """GraphQL query constants for stake.com API."""
-    
+
     USER_BALANCES = """
     query UserBalances {
       user {
@@ -221,7 +221,7 @@ class GraphQLQueries:
       }
     }
     """
-    
+
     # Validated against the live API (fields confirmed to exist on type User)
     USER_PROFILE = """
     query UserProfile {
@@ -235,7 +235,7 @@ class GraphQLQueries:
       }
     }
     """
-    
+
     # UNVERIFIED DRAFT — this query shape does not match the live schema;
     # kept only as a starting point for future work
     CASINO_GAMES = """
@@ -269,7 +269,7 @@ class GraphQLQueries:
       }
     }
     """
-    
+
     # Validated against the live API — public realtime feed of house bets
     # across all bet types (captured from the site's own AllHouseBets query)
     ALL_HOUSE_BETS = """
@@ -613,7 +613,7 @@ class GraphQLQueries:
       }
     }
     """
-    
+
     # Validated against the live API — bet history is user.houseBetList;
     # 'game' on the outer Bet is an object, while CasinoBet.game is an enum
     BET_HISTORY = """
@@ -1040,7 +1040,6 @@ class GraphQLQueries:
     HIGHROLLER_HOUSE_BETS = ALL_HOUSE_BETS.replace(
         "query AllHouseBets", "query HighrollerHouseBets"
     ).replace("allHouseBets(limit", "highrollerHouseBets(limit")
-
 
     PUBLIC_CHATS = """
     query PublicChats {
@@ -1475,6 +1474,7 @@ class GraphQLQueries:
     }
     """
 
+
 class GraphQLSubscriptions:
     """GraphQL subscriptions for the /_api/websockets endpoint.
 
@@ -1565,7 +1565,8 @@ class GraphQLSubscriptions:
     ).replace("allHouseBets(limit: $limit)", "allHouseBets")
 
     HIGHROLLER_HOUSE_BETS = GraphQLQueries.ALL_HOUSE_BETS.replace(
-        "query AllHouseBets($limit: Int = 10)", "subscription HighrollerHouseBetsSubscription"
+        "query AllHouseBets($limit: Int = 10)",
+        "subscription HighrollerHouseBetsSubscription",
     ).replace("allHouseBets(limit: $limit)", "highrollerHouseBets")
 
     ALL_SPORT_BETS = """
@@ -1761,17 +1762,25 @@ class GraphQLMutations:
     small amount on your own account before relying on them.
     """
 
-    CRASH_BET = """
+    CRASH_BET = (
+        """
     mutation MultiplayerCrashBet($amount: Float!, $currency: CurrencyEnum!, $cashoutAt: Float!) {
-      multiplayerCrashBet(amount: $amount, currency: $currency, cashoutAt: $cashoutAt) {""" + _CRASH_BET_FIELDS + """      }
+      multiplayerCrashBet(amount: $amount, currency: $currency, cashoutAt: $cashoutAt) {"""
+        + _CRASH_BET_FIELDS
+        + """      }
     }
     """
+    )
 
-    CRASH_CASHOUT = """
+    CRASH_CASHOUT = (
+        """
     mutation MultiplayerCrashCashout {
-      multiplayerCrashCashout {""" + _CRASH_BET_FIELDS + """      }
+      multiplayerCrashCashout {"""
+        + _CRASH_BET_FIELDS
+        + """      }
     }
     """
+    )
 
     SLIDE_BETS = """
     mutation SlideBets($currency: CurrencyEnum!, $identifier: String, $bets: [SlideBetsBetsInput!]!) {
@@ -1790,23 +1799,35 @@ class GraphQLMutations:
     }
     """
 
-    FLIP_BET = """
+    FLIP_BET = (
+        """
     mutation FlipBet($amount: Float!, $currency: CurrencyEnum!, $identifier: String, $guesses: [FlipConditionEnum!]!) {
-      flipBet(amount: $amount, currency: $currency, identifier: $identifier, guesses: $guesses) {""" + _FLIP_BET_FIELDS + """      }
+      flipBet(amount: $amount, currency: $currency, identifier: $identifier, guesses: $guesses) {"""
+        + _FLIP_BET_FIELDS
+        + """      }
     }
     """
+    )
 
-    FLIP_NEXT = """
+    FLIP_NEXT = (
+        """
     mutation FlipNext($condition: FlipConditionEnum!) {
-      flipNext(condition: $condition) {""" + _FLIP_BET_FIELDS + """      }
+      flipNext(condition: $condition) {"""
+        + _FLIP_BET_FIELDS
+        + """      }
     }
     """
+    )
 
-    FLIP_CASHOUT = """
+    FLIP_CASHOUT = (
+        """
     mutation FlipCashout($identifier: String!) {
-      flipCashout(identifier: $identifier) {""" + _FLIP_BET_FIELDS + """      }
+      flipCashout(identifier: $identifier) {"""
+        + _FLIP_BET_FIELDS
+        + """      }
     }
     """
+    )
 
     ZOO_BET = """
     mutation ZooBet($animals: [ZooBetAnimalsInput!]!, $currency: CurrencyEnum!, $identifier: String) {

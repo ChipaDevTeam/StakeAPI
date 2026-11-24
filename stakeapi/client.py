@@ -1,34 +1,41 @@
 """Main client for StakeAPI."""
 
 import asyncio
-import uuid
-from typing import Optional, Dict, Any, List
-import aiohttp
 import json
+import uuid
+from decimal import Decimal
+from types import TracebackType
+from typing import Any, Dict, List, Optional, Tuple, Type, cast
 from urllib.parse import urljoin
 
-from .exceptions import (
-    StakeAPIError,
-    AuthenticationError,
-    RateLimitError,
-    NetworkError,
-    GraphQLError,
-    PermissionDeniedError,
-    ValidationError,
-    BettingDisabledError,
-)
-from .models import User, Game, SportEvent, Bet
-from .endpoints import Endpoints, GraphQLQueries, GraphQLMutations
+import aiohttp
+
 from .auth import AuthManager
+from .endpoints import GraphQLMutations, GraphQLQueries
+from .exceptions import (
+    AuthenticationError,
+    BettingDisabledError,
+    GraphQLError,
+    NetworkError,
+    PermissionDeniedError,
+    RateLimitError,
+    StakeAPIError,
+    ValidationError,
+)
+from .models import Bet, Game, SportEvent, User
 from .websocket import StakeWebSocket
 
 
-def _parse_datetime(value):
-    """Parse the RFC 1123 dates the API returns (e.g. 'Sat, 11 Jul 2026 07:41:10 GMT')."""
+def _parse_datetime(value: Optional[str]) -> Any:
+    """Parse the RFC 1123 dates the API returns.
+
+    Example: 'Sat, 11 Jul 2026 07:41:10 GMT'.
+    """
     if not value:
         return None
     try:
         from email.utils import parsedate_to_datetime
+
         return parsedate_to_datetime(value)
     except (TypeError, ValueError):
         return value  # let pydantic try ISO formats
@@ -62,9 +69,9 @@ def _bet_from_entry(entry: Dict[str, Any]) -> Optional[Bet]:
             game_id=game_id,
             game_name=game.get("name"),
             bet_type=bet.get("__typename", "CasinoBet"),
-            amount=str(bet.get("amount") or 0),
+            amount=Decimal(str(bet.get("amount") or 0)),
             currency=bet.get("currency"),
-            potential_payout=str(payout),
+            potential_payout=Decimal(str(payout)),
             odds=bet.get("payoutMultiplier"),
             status=status,
             placed_at=_parse_datetime(bet.get("createdAt") or bet.get("updatedAt")),
@@ -114,7 +121,11 @@ def _game_from_kurator(game: Dict[str, Any]) -> Optional[Game]:
     if not game.get("id"):
         return None
     groups = [g.get("group") or {} for g in game.get("groupGames") or []]
-    categories = [g.get("translation") for g in groups if g.get("type") == "category"]
+    categories = [
+        str(g["translation"])
+        for g in groups
+        if g.get("type") == "category" and g.get("translation")
+    ]
     provider = (game.get("providerGroup") or {}).get("name") or next(
         (g.get("translation") for g in groups if g.get("type") == "provider"), ""
     )
@@ -124,11 +135,11 @@ def _game_from_kurator(game: Dict[str, Any]) -> Optional[Game]:
             id=game["id"],
             name=game.get("name", ""),
             slug=game.get("slug"),
-            category=categories[0] if categories else (game.get("type") or ""),
+            category=categories[0] if categories else str(game.get("type") or ""),
             provider=provider or "",
             description=game.get("description"),
             rtp=round((1 - edge) * 100, 4) if edge is not None else None,
-            features=[g.get("translation") for g in groups if g.get("translation")],
+            features=[str(g["translation"]) for g in groups if g.get("translation")],
             thumbnail_url=game.get("thumbnailUrl"),
             player_count=game.get("playerCount"),
         )
@@ -138,7 +149,7 @@ def _game_from_kurator(game: Dict[str, Any]) -> Optional[Game]:
 
 class StakeAPI:
     """Main client for interacting with stake.com API."""
-    
+
     def __init__(
         self,
         access_token: Optional[str] = None,
@@ -160,8 +171,10 @@ class StakeAPI:
                 If omitted but cookies are provided, the 'session' cookie value
                 is used as the access token (they are the same value on stake).
             session_cookie: Session cookie for authentication
-            cf_clearance: Cloudflare clearance cookie (required to bypass Cloudflare protection)
-            user_agent: Your browser's User-Agent (must match the one used to obtain cf_clearance)
+            cf_clearance: Cloudflare clearance cookie (required to get past
+                Cloudflare protection)
+            user_agent: Your browser's User-Agent (must match the one used to
+                obtain cf_clearance)
             base_url: Base URL for the API. Use this to point at a regional
                 mirror, e.g. "https://stake1017.com" or "https://stake.bet".
                 Your cookies (session, cf_clearance) must come from the SAME
@@ -183,9 +196,12 @@ class StakeAPI:
             ValidationError: If base_url is not a valid http(s) URL, or the
                 cookie file is missing/empty/unreadable.
         """
-        if not isinstance(base_url, str) or not base_url.startswith(("http://", "https://")):
+        if not isinstance(base_url, str) or not base_url.startswith(
+            ("http://", "https://")
+        ):
             raise ValidationError(
-                f"Invalid base_url: {base_url!r}. It must start with http:// or https://, "
+                f"Invalid base_url: {base_url!r}. "
+                "It must start with http:// or https://, "
                 "e.g. 'https://stake.com' or a mirror like 'https://stake1017.com'."
             )
 
@@ -226,22 +242,31 @@ class StakeAPI:
         self.timeout = timeout
         self.rate_limit = rate_limit
         self.allow_betting = allow_betting
-        
+
         self._session: Optional[aiohttp.ClientSession] = None
         self._auth_manager = AuthManager(access_token)
-        
-    async def __aenter__(self):
+
+    async def __aenter__(self) -> "StakeAPI":
         """Async context manager entry."""
         await self._create_session()
         return self
-        
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+
+    async def __aexit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
         """Async context manager exit."""
         await self.close()
-        
-    def _session_headers(self):
+
+    def _session_headers(self) -> Tuple[Dict[str, str], Dict[str, str]]:
         """Build the default headers and cookies sent with every request."""
-        ua = self.user_agent or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
+        ua = (
+            self.user_agent
+            or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
+        )
         headers = {
             "User-Agent": ua,
             "Accept": "application/graphql+json, application/json",
@@ -256,7 +281,7 @@ class StakeAPI:
             "Sec-Fetch-Site": "same-origin",
             "X-Language": "en",
         }
-        
+
         if self.access_token:
             headers["X-Access-Token"] = self.access_token
 
@@ -273,7 +298,7 @@ class StakeAPI:
                 cookies["cf_clearance"] = self.cf_clearance
         return headers, cookies
 
-    async def _create_session(self):
+    async def _create_session(self) -> None:
         """Create aiohttp session with proper headers."""
         headers, cookies = self._session_headers()
         timeout = aiohttp.ClientTimeout(total=self.timeout)
@@ -295,12 +320,12 @@ class StakeAPI:
                     print(bet)
         """
         return StakeWebSocket(self, language=language)
-        
-    async def close(self):
+
+    async def close(self) -> None:
         """Close the session."""
         if self._session:
             await self._session.close()
-            
+
     async def _request(
         self,
         method: str,
@@ -311,16 +336,16 @@ class StakeAPI:
     ) -> Dict[Any, Any]:
         """
         Make an authenticated request to the API.
-        
+
         Args:
             method: HTTP method
             endpoint: API endpoint
             params: Query parameters
             data: Request body data
-            
+
         Returns:
             Response data as dictionary
-            
+
         Raises:
             StakeAPIError: For API errors
             AuthenticationError: For authentication errors
@@ -329,24 +354,28 @@ class StakeAPI:
         """
         if not self._session:
             await self._create_session()
+        session = cast(aiohttp.ClientSession, self._session)
 
         url = urljoin(self.base_url + "/", endpoint.lstrip("/"))
 
         try:
-            async with self._session.request(
+            async with session.request(
                 method, url, params=params, json=data, headers=headers
             ) as response:
                 if response.status == 403:
                     raise StakeAPIError(
-                        f"403 Forbidden — Cloudflare is blocking the request to {self.base_url}. "
-                        "Make sure you provide a valid 'cf_clearance' cookie obtained from "
-                        f"the SAME domain ({self.base_url}). "
-                        f"To get it: open {self.base_url} in your browser → DevTools (F12) → "
-                        "Application tab → Cookies → copy the 'cf_clearance' value. "
-                        "Then pass it as: StakeAPI(access_token=..., cf_clearance='...')"
+                        "403 Forbidden — Cloudflare is blocking the request to "
+                        f"{self.base_url}. Make sure you provide a valid "
+                        "'cf_clearance' cookie obtained from the SAME domain "
+                        f"({self.base_url}). To get it: open {self.base_url} in "
+                        "your browser → DevTools (F12) → Application tab → "
+                        "Cookies → copy the 'cf_clearance' value. Then pass it "
+                        "as: StakeAPI(access_token=..., cf_clearance='...')"
                     )
                 elif response.status == 401:
-                    raise AuthenticationError("Invalid access token or unauthorized access")
+                    raise AuthenticationError(
+                        "Invalid access token or unauthorized access"
+                    )
                 elif response.status == 429:
                     retry_after = response.headers.get("Retry-After")
                     message = "Rate limit exceeded"
@@ -365,15 +394,18 @@ class StakeAPI:
                 except (json.JSONDecodeError, aiohttp.ContentTypeError, ValueError):
                     body_preview = (await response.text())[:200]
                     raise NetworkError(
-                        f"Expected JSON but got a non-JSON response (status {response.status}) "
-                        f"from {url}. This usually means a Cloudflare challenge page or a "
-                        f"redirect to a login page. Response starts with: {body_preview!r}"
+                        "Expected JSON but got a non-JSON response "
+                        f"(status {response.status}) from {url}. This usually "
+                        "means a Cloudflare challenge page or a redirect to a "
+                        f"login page. Response starts with: {body_preview!r}"
                     )
 
                 if response.status >= 400:
-                    raise StakeAPIError(f"API error: {response.status} - {response_data}")
+                    raise StakeAPIError(
+                        f"API error: {response.status} - {response_data}"
+                    )
 
-                return response_data
+                return cast(Dict[Any, Any], response_data)
 
         except StakeAPIError:
             raise
@@ -387,34 +419,35 @@ class StakeAPI:
             raise NetworkError(
                 f"Could not connect to {self.base_url}: {e}. "
                 "The domain may be blocked in your region or does not exist — "
-                "you can pass a different mirror, e.g. StakeAPI(base_url='https://stake1017.com')."
+                "you can pass a different mirror, e.g. "
+                "StakeAPI(base_url='https://stake1017.com')."
             )
         except aiohttp.ClientError as e:
             raise NetworkError(f"Request failed: {e}")
-    
+
     async def _graphql_request(
         self,
         query: str,
         variables: Optional[Dict[str, Any]] = None,
-        operation_name: Optional[str] = None
+        operation_name: Optional[str] = None,
     ) -> Dict[Any, Any]:
         """
         Make a GraphQL request to the stake.com API.
-        
+
         Args:
             query: GraphQL query string
             variables: Query variables
             operation_name: Operation name
-            
+
         Returns:
             GraphQL response data
-            
+
         Raises:
             GraphQLError: When the API returns GraphQL-level errors
             PermissionDeniedError: When the API rejects the request as unauthorized
             AuthenticationError: For authentication errors
         """
-        payload = {
+        payload: Dict[str, Any] = {
             "query": query,
         }
 
@@ -429,7 +462,9 @@ class StakeAPI:
         if operation_name:
             extra_headers = {
                 "X-Operation-Name": operation_name,
-                "X-Operation-Type": "mutation" if query.lstrip().startswith("mutation") else "query",
+                "X-Operation-Type": (
+                    "mutation" if query.lstrip().startswith("mutation") else "query"
+                ),
             }
 
         response = await self._request(
@@ -438,7 +473,8 @@ class StakeAPI:
 
         if not isinstance(response, dict):
             raise GraphQLError(
-                f"Unexpected GraphQL response type: {type(response).__name__} - {response!r}"
+                "Unexpected GraphQL response type: "
+                f"{type(response).__name__} - {response!r}"
             )
 
         errors = response.get("errors")
@@ -452,9 +488,9 @@ class StakeAPI:
                 f"raw response: {response!r}"
             )
 
-        return data
-            
-    def _raise_for_errors(self, errors: List[Dict[str, Any]]):
+        return cast(Dict[str, Any], data)
+
+    def _raise_for_errors(self, errors: List[Dict[str, Any]]) -> None:
         """Raise PermissionDeniedError or GraphQLError for an API error list."""
         error_messages = [error.get("message", "Unknown error") for error in errors]
         error_types = [
@@ -464,8 +500,12 @@ class StakeAPI:
         joined = ", ".join(error_messages)
 
         permission_markers = (
-            "not allowed", "unauthorized", "permission", "forbidden",
-            "notauthenticated", "please log in",
+            "not allowed",
+            "unauthorized",
+            "permission",
+            "forbidden",
+            "notauthenticated",
+            "please log in",
         )
         if any(
             marker in msg.lower()
@@ -474,11 +514,13 @@ class StakeAPI:
         ):
             raise PermissionDeniedError(
                 f"GraphQL permission error: {joined}. This usually means: "
-                "1) your access token is invalid or expired — get a fresh one from "
-                f"{self.base_url} (DevTools → any GraphQL request → 'x-access-token' header); "
-                "2) your session/cf_clearance cookies were obtained from a different domain "
-                f"than base_url ({self.base_url}) — token and cookies must all come from the "
-                "same mirror; or 3) your account lacks permission for this operation.",
+                "1) your access token is invalid or expired — get a fresh one "
+                f"from {self.base_url} (DevTools → any GraphQL request → "
+                "'x-access-token' header); 2) your session/cf_clearance cookies "
+                "were obtained from a different domain than base_url "
+                f"({self.base_url}) — token and cookies must all come from the "
+                "same mirror; or 3) your account lacks permission for this "
+                "operation.",
                 errors=errors,
             )
 
@@ -515,7 +557,10 @@ class StakeAPI:
         group = data.get("slugKuratorGroup")
         if not group:
             raise StakeAPIError(f"Unknown casino group {category!r}")
-        games = (_game_from_kurator(g.get("game") or {}) for g in group.get("groupGamesList") or [])
+        games = (
+            _game_from_kurator(g.get("game") or {})
+            for g in group.get("groupGamesList") or []
+        )
         return [g for g in games if g]
 
     async def get_game_details(self, game_id: str) -> Game:
@@ -536,7 +581,9 @@ class StakeAPI:
             raise StakeAPIError(f"Unknown game {game_id!r}")
         return game
 
-    async def search_casino_games(self, query: str, limit: int = 20, offset: int = 0) -> List[Game]:
+    async def search_casino_games(
+        self, query: str, limit: int = 20, offset: int = 0
+    ) -> List[Game]:
         """Search casino games by name."""
         data = await self._graphql_request(
             GraphQLQueries.SEARCH_CASINO,
@@ -547,7 +594,10 @@ class StakeAPI:
         return [g for g in games if g]
 
     async def get_casino_collection(
-        self, collection_type: str = "provider", sort: str = "popular", filter: str = "all"
+        self,
+        collection_type: str = "provider",
+        sort: str = "popular",
+        filter: str = "all",
     ) -> List[Dict[str, Any]]:
         """
         Get a casino lobby collection, e.g. the list of game providers.
@@ -565,7 +615,9 @@ class StakeAPI:
             variables={"type": collection_type, "sort": sort, "filter": filter},
             operation_name="KuratorCollection",
         )
-        return [c["group"] for c in data.get("kuratorCollection") or [] if c.get("group")]
+        return [
+            c["group"] for c in data.get("kuratorCollection") or [] if c.get("group")
+        ]
 
     async def get_game_payouts(self) -> Dict[str, List[Dict[str, Any]]]:
         """
@@ -585,7 +637,9 @@ class StakeAPI:
             "wheel": info.get("wheelPayouts") or [],
         }
 
-    async def get_crash_history(self, limit: int = 20, offset: int = 0) -> List[Dict[str, Any]]:
+    async def get_crash_history(
+        self, limit: int = 20, offset: int = 0
+    ) -> List[Dict[str, Any]]:
         """Get recent Crash rounds (id, startTime, crashpoint, hash)."""
         data = await self._graphql_request(
             GraphQLQueries.CRASH_HISTORY,
@@ -604,9 +658,11 @@ class StakeAPI:
         game = data.get("crashGame")
         if not game:
             raise StakeAPIError(f"Unknown crash game {game_id!r}")
-        return game
+        return cast(Dict[str, Any], game)
 
-    async def get_slide_history(self, limit: int = 20, offset: int = 0) -> List[Dict[str, Any]]:
+    async def get_slide_history(
+        self, limit: int = 20, offset: int = 0
+    ) -> List[Dict[str, Any]]:
         """Get recent Slide rounds (id, multiplier, startTime, hash)."""
         data = await self._graphql_request(
             GraphQLQueries.SLIDE_HISTORY,
@@ -650,7 +706,7 @@ class StakeAPI:
         sport_data = data.get("slugSport")
         if not sport_data:
             raise StakeAPIError(f"Unknown sport {sport!r}: {data!r}")
-        return sport_data
+        return cast(Dict[str, Any], sport_data)
 
     async def get_sports_events(self, sport: Optional[str] = None) -> List[SportEvent]:
         """
@@ -806,7 +862,7 @@ class StakeAPI:
         result = data.get("slugTournament")
         if not result:
             raise StakeAPIError(f"Unknown tournament {sport}/{category}/{tournament}")
-        return result
+        return cast(Dict[str, Any], result)
 
     async def search_sports(
         self, query: str, group: str = "winner", limit: int = 20, offset: int = 0
@@ -814,11 +870,17 @@ class StakeAPI:
         """Search sport fixtures by team, player or event name."""
         data = await self._graphql_request(
             GraphQLQueries.SEARCH_SPORTS,
-            variables={"query": query, "groups": group, "limit": limit, "offset": offset},
+            variables={
+                "query": query,
+                "groups": group,
+                "limit": limit,
+                "offset": offset,
+            },
             operation_name="searchQuerySports",
         )
         return [
-            r["fixture"] for r in data.get("sportFixtureQuery") or []
+            r["fixture"]
+            for r in data.get("sportFixtureQuery") or []
             if r.get("fixture")
         ]
 
@@ -839,7 +901,11 @@ class StakeAPI:
         """
         data = await self._graphql_request(
             GraphQLQueries.TRENDING_MATCHES,
-            variables={"sortBy": sort_by, "sportId": sport_id, "groups": groups or ["winner"]},
+            variables={
+                "sortBy": sort_by,
+                "sportId": sport_id,
+                "groups": groups or ["winner"],
+            },
             operation_name="SportBetTrendingMatches",
         )
         return data.get("sportHomepageTrendingMatches") or []
@@ -886,11 +952,11 @@ class StakeAPI:
             verified=bool(user.get("hasEmailVerified")),
             created_at=_parse_datetime(user.get("createdAt")),
         )
-        
+
     async def get_user_balance(self) -> Dict[str, Dict[str, float]]:
         """
         Get user account balance using GraphQL.
-        
+
         Returns:
             Balance information by currency with available and vault amounts
             Format: {
@@ -919,15 +985,12 @@ class StakeAPI:
           }
         }
         """
-        
+
         data = await self._graphql_request(query, operation_name="UserBalances")
-        
+
         # Process the response to create a more convenient format
-        result = {
-            "available": {},
-            "vault": {}
-        }
-        
+        result: Dict[str, Dict[str, float]] = {"available": {}, "vault": {}}
+
         if "user" in data and data["user"] and "balances" in data["user"]:
             for entry in data["user"]["balances"]:
                 if "available" in entry:
@@ -938,9 +1001,9 @@ class StakeAPI:
                     currency = entry["vault"].get("currency", "").lower()
                     amount = float(entry["vault"].get("amount", 0))
                     result["vault"][currency] = amount
-        
+
         return result
-        
+
     # Betting Methods
     async def place_bet(self, bet_data: Dict[str, Any]) -> Bet:
         """
@@ -957,7 +1020,7 @@ class StakeAPI:
     # Real-money betting. UNVALIDATED: built from the site's own code but never
     # sent to the live API. Every method needs allow_betting=True on the client
     # and supports dry_run=True, which returns the request instead of sending it.
-    def _check_betting(self, method: str):
+    def _check_betting(self, method: str) -> None:
         if not self.allow_betting:
             raise BettingDisabledError(
                 f"{method} places a real-money bet. Create the client with "
@@ -966,11 +1029,15 @@ class StakeAPI:
             )
 
     @staticmethod
-    def _check_amount(amount: float, currency: str):
+    def _check_amount(amount: float, currency: str) -> None:
         if amount is None or amount < 0:
-            raise ValidationError(f"Bet amount must be zero or positive, got {amount!r}")
+            raise ValidationError(
+                f"Bet amount must be zero or positive, got {amount!r}"
+            )
         if not currency or not isinstance(currency, str):
-            raise ValidationError(f"currency must be a currency code such as 'btc', got {currency!r}")
+            raise ValidationError(
+                f"currency must be a currency code such as 'btc', got {currency!r}"
+            )
 
     async def _bet_mutation(
         self,
@@ -991,8 +1058,10 @@ class StakeAPI:
                 "variables": variables,
             }
         self._check_betting(method)
-        data = await self._graphql_request(query, variables=variables, operation_name=operation_name)
-        return data.get(field) or {}
+        data = await self._graphql_request(
+            query, variables=variables, operation_name=operation_name
+        )
+        return cast(Dict[str, Any], data.get(field) or {})
 
     async def casino_bet(
         self, path: str, variables: Dict[str, Any], dry_run: bool = False
@@ -1019,16 +1088,24 @@ class StakeAPI:
         path = path.strip("/")
         body = {"identifier": uuid.uuid4().hex, **variables}
         if dry_run:
-            return {"dry_run": True, "endpoint": f"/_api/casino/{path}", "variables": body}
+            return {
+                "dry_run": True,
+                "endpoint": f"/_api/casino/{path}",
+                "variables": body,
+            }
         self._check_betting("casino_bet")
         response = await self._request("POST", f"/_api/casino/{path}", data=body)
         if not isinstance(response, dict):
-            raise StakeAPIError(f"Unexpected response from /_api/casino/{path}: {response!r}")
+            raise StakeAPIError(
+                f"Unexpected response from /_api/casino/{path}: {response!r}"
+            )
         if response.get("errors"):
             self._raise_for_errors(response["errors"])
         results = [v for v in response.values() if isinstance(v, dict)]
         if len(results) != 1:
-            raise StakeAPIError(f"Unexpected response from /_api/casino/{path}: {response!r}")
+            raise StakeAPIError(
+                f"Unexpected response from /_api/casino/{path}: {response!r}"
+            )
         return results[0]
 
     async def dice_roll(
@@ -1054,12 +1131,21 @@ class StakeAPI:
         """
         self._check_amount(amount, currency)
         if condition not in ("above", "below"):
-            raise ValidationError(f"condition must be 'above' or 'below', got {condition!r}")
+            raise ValidationError(
+                f"condition must be 'above' or 'below', got {condition!r}"
+            )
         if not 2 <= target <= 98:
-            raise ValidationError(f"Dice target must be between 2 and 98, got {target!r}")
+            raise ValidationError(
+                f"Dice target must be between 2 and 98, got {target!r}"
+            )
         return await self.casino_bet(
             "dice/roll",
-            {"target": target, "condition": condition, "amount": amount, "currency": currency},
+            {
+                "target": target,
+                "condition": condition,
+                "amount": amount,
+                "currency": currency,
+            },
             dry_run=dry_run,
         )
 
@@ -1076,15 +1162,23 @@ class StakeAPI:
         if cashout_at is None or cashout_at <= 1:
             raise ValidationError(f"cashout_at must be above 1, got {cashout_at!r}")
         return await self._bet_mutation(
-            "crash_bet", GraphQLMutations.CRASH_BET, "MultiplayerCrashBet", "multiplayerCrashBet",
-            {"amount": amount, "currency": currency, "cashoutAt": cashout_at}, dry_run,
+            "crash_bet",
+            GraphQLMutations.CRASH_BET,
+            "MultiplayerCrashBet",
+            "multiplayerCrashBet",
+            {"amount": amount, "currency": currency, "cashoutAt": cashout_at},
+            dry_run,
         )
 
     async def crash_cashout(self, dry_run: bool = False) -> Dict[str, Any]:
         """Cash out your bet in the running Crash round now."""
         return await self._bet_mutation(
-            "crash_cashout", GraphQLMutations.CRASH_CASHOUT, "MultiplayerCrashCashout",
-            "multiplayerCrashCashout", {}, dry_run,
+            "crash_cashout",
+            GraphQLMutations.CRASH_CASHOUT,
+            "MultiplayerCrashCashout",
+            "multiplayerCrashCashout",
+            {},
+            dry_run,
         )
 
     async def slide_bet(
@@ -1093,9 +1187,11 @@ class StakeAPI:
         bets: List[Dict[str, Any]],
         identifier: Optional[str] = None,
         dry_run: bool = False,
-    ) -> List[Dict[str, Any]]:
+    ) -> Any:
         """
         Place bets on the next Slide round.
+
+        Returns the list of placed bets (or the request dict with dry_run).
 
         Args:
             bets: SlideBetsBetsInput objects, passed through as given. Their
@@ -1103,8 +1199,15 @@ class StakeAPI:
         """
         self._check_amount(0, currency)
         result = await self._bet_mutation(
-            "slide_bet", GraphQLMutations.SLIDE_BETS, "SlideBets", "slideBets",
-            {"currency": currency, "bets": bets, "identifier": identifier or uuid.uuid4().hex},
+            "slide_bet",
+            GraphQLMutations.SLIDE_BETS,
+            "SlideBets",
+            "slideBets",
+            {
+                "currency": currency,
+                "bets": bets,
+                "identifier": identifier or uuid.uuid4().hex,
+            },
             dry_run,
         )
         return result or []
@@ -1126,24 +1229,41 @@ class StakeAPI:
         """
         self._check_amount(amount, currency)
         return await self._bet_mutation(
-            "flip_bet", GraphQLMutations.FLIP_BET, "FlipBet", "flipBet",
-            {"amount": amount, "currency": currency, "guesses": guesses,
-             "identifier": identifier or uuid.uuid4().hex},
+            "flip_bet",
+            GraphQLMutations.FLIP_BET,
+            "FlipBet",
+            "flipBet",
+            {
+                "amount": amount,
+                "currency": currency,
+                "guesses": guesses,
+                "identifier": identifier or uuid.uuid4().hex,
+            },
             dry_run,
         )
 
     async def flip_next(self, condition: str, dry_run: bool = False) -> Dict[str, Any]:
         """Flip the next coin in your active Flip game."""
         return await self._bet_mutation(
-            "flip_next", GraphQLMutations.FLIP_NEXT, "FlipNext", "flipNext",
-            {"condition": condition}, dry_run,
+            "flip_next",
+            GraphQLMutations.FLIP_NEXT,
+            "FlipNext",
+            "flipNext",
+            {"condition": condition},
+            dry_run,
         )
 
-    async def flip_cashout(self, identifier: str, dry_run: bool = False) -> Dict[str, Any]:
+    async def flip_cashout(
+        self, identifier: str, dry_run: bool = False
+    ) -> Dict[str, Any]:
         """Cash out your active Flip game."""
         return await self._bet_mutation(
-            "flip_cashout", GraphQLMutations.FLIP_CASHOUT, "FlipCashout", "flipCashout",
-            {"identifier": identifier}, dry_run,
+            "flip_cashout",
+            GraphQLMutations.FLIP_CASHOUT,
+            "FlipCashout",
+            "flipCashout",
+            {"identifier": identifier},
+            dry_run,
         )
 
     async def zoo_bet(
@@ -1163,8 +1283,15 @@ class StakeAPI:
         """
         self._check_amount(0, currency)
         return await self._bet_mutation(
-            "zoo_bet", GraphQLMutations.ZOO_BET, "ZooBet", "zooBet",
-            {"currency": currency, "animals": animals, "identifier": identifier or uuid.uuid4().hex},
+            "zoo_bet",
+            GraphQLMutations.ZOO_BET,
+            "ZooBet",
+            "zooBet",
+            {
+                "currency": currency,
+                "animals": animals,
+                "identifier": identifier or uuid.uuid4().hex,
+            },
             dry_run,
         )
 
@@ -1195,10 +1322,18 @@ class StakeAPI:
         if not outcome_ids:
             raise ValidationError("outcome_ids must contain at least one outcome id")
         return await self._bet_mutation(
-            "place_sport_bet", GraphQLMutations.SPORT_BET, "BetSlipFooter_SportBet", "sportBet",
-            {"amount": amount, "currency": currency, "outcomeIds": list(outcome_ids),
-             "oddsChange": odds_change, "betType": bet_type,
-             "identifier": identifier or uuid.uuid4().hex},
+            "place_sport_bet",
+            GraphQLMutations.SPORT_BET,
+            "BetSlipFooter_SportBet",
+            "sportBet",
+            {
+                "amount": amount,
+                "currency": currency,
+                "outcomeIds": list(outcome_ids),
+                "oddsChange": odds_change,
+                "betType": bet_type,
+                "identifier": identifier or uuid.uuid4().hex,
+            },
             dry_run,
         )
 
@@ -1218,9 +1353,15 @@ class StakeAPI:
             cashout_percent: Cash out only part of the bet
         """
         return await self._bet_mutation(
-            "cashout_sport_bet", GraphQLMutations.SPORT_BET_CASHOUT,
-            "SportBetPreview_CashoutSportBet", "cashoutSportBet",
-            {"betId": bet_id, "multiplier": multiplier, "cashoutPercent": cashout_percent},
+            "cashout_sport_bet",
+            GraphQLMutations.SPORT_BET_CASHOUT,
+            "SportBetPreview_CashoutSportBet",
+            "cashoutSportBet",
+            {
+                "betId": bet_id,
+                "multiplier": multiplier,
+                "cashoutPercent": cashout_percent,
+            },
             dry_run,
         )
 
@@ -1322,7 +1463,7 @@ class StakeAPI:
             GraphQLQueries.CURRENCY_LIMITS, operation_name="CurrencyLimits"
         )
 
-        def value(field):
+        def value(field: Optional[Dict[str, Any]]) -> Optional[float]:
             raw = (field or {}).get("value")
             return float(raw) if raw is not None else None
 
@@ -1337,7 +1478,11 @@ class StakeAPI:
 
     # Promotion Methods
     async def get_challenges(
-        self, limit: int = 20, offset: int = 0, sort: str = "startAt", direction: str = "desc"
+        self,
+        limit: int = 20,
+        offset: int = 0,
+        sort: str = "startAt",
+        direction: str = "desc",
     ) -> Dict[str, Any]:
         """
         Get public casino challenges (multiplier targets with a prize).
@@ -1351,7 +1496,12 @@ class StakeAPI:
         """
         data = await self._graphql_request(
             GraphQLQueries.CHALLENGES,
-            variables={"limit": limit, "offset": offset, "sort": sort, "direction": direction},
+            variables={
+                "limit": limit,
+                "offset": offset,
+                "sort": sort,
+                "direction": direction,
+            },
             operation_name="ChallengePublicList",
         )
         return {
@@ -1359,7 +1509,9 @@ class StakeAPI:
             "challenges": data.get("challengeUnauthenticatedUserList") or [],
         }
 
-    async def get_active_races(self, leaderboard_limit: int = 10) -> List[Dict[str, Any]]:
+    async def get_active_races(
+        self, leaderboard_limit: int = 10
+    ) -> List[Dict[str, Any]]:
         """Get the currently running wager races, each with its top leaderboard."""
         data = await self._graphql_request(
             GraphQLQueries.ACTIVE_RACES,
@@ -1369,7 +1521,10 @@ class StakeAPI:
         return data.get("activeRaces") or []
 
     async def get_public_chats(self) -> List[Dict[str, Any]]:
-        """List public chat rooms (id, name, isPublic), e.g. for StakeWebSocket.chat_messages."""
+        """List public chat rooms (id, name, isPublic).
+
+        Use the ids with StakeWebSocket.chat_messages.
+        """
         data = await self._graphql_request(
             GraphQLQueries.PUBLIC_CHATS, operation_name="PublicChats"
         )
@@ -1392,7 +1547,7 @@ class StakeAPI:
                 f"No user data in {operation_name} response: {data!r}. "
                 "Your session may have expired — refresh your cookies."
             )
-        return user
+        return cast(Dict[str, Any], user)
 
     async def get_user_stats(self, name: str) -> Dict[str, Any]:
         """
@@ -1407,12 +1562,14 @@ class StakeAPI:
             player hides their stats.
         """
         data = await self._graphql_request(
-            GraphQLQueries.USER_STATS, variables={"name": name}, operation_name="UserDetails"
+            GraphQLQueries.USER_STATS,
+            variables={"name": name},
+            operation_name="UserDetails",
         )
         user = data.get("user")
         if not user:
             raise StakeAPIError(f"Unknown user {name!r}")
-        return user
+        return cast(Dict[str, Any], user)
 
     async def get_account_status(self) -> Dict[str, Any]:
         """
@@ -1434,13 +1591,18 @@ class StakeAPI:
         return await self._user_query(GraphQLQueries.VIP_INFO, "VipMeta")
 
     async def get_claimable_bonuses(self) -> List[Dict[str, Any]]:
-        """Get self-serve bonuses you can claim now (bonusCodeId, code, category, availableAt)."""
+        """Get self-serve bonuses you can claim now.
+
+        Each has bonusCodeId, code, category and availableAt.
+        """
         data = await self._graphql_request(
             GraphQLQueries.CLAIMABLE_BONUSES, operation_name="ClaimableVipRewards"
         )
         return data.get("claimableSelfServeBonuses") or []
 
-    async def get_unclaimed_bonuses(self, limit: int = 20, offset: int = 0) -> List[Dict[str, Any]]:
+    async def get_unclaimed_bonuses(
+        self, limit: int = 20, offset: int = 0
+    ) -> List[Dict[str, Any]]:
         """Get bonus codes credited to you that have not been redeemed."""
         data = await self._graphql_request(
             GraphQLQueries.UNCLAIMED_BONUSES,
@@ -1450,8 +1612,13 @@ class StakeAPI:
         return data.get("userBonusUnclaimedList") or []
 
     async def get_active_rollovers(self) -> List[Dict[str, Any]]:
-        """Get wagering requirements on your bonuses (amount, progress, expectedAmount, maxBet)."""
-        user = await self._user_query(GraphQLQueries.ACTIVE_ROLLOVERS, "UserActiveRollovers")
+        """Get wagering requirements on your bonuses.
+
+        Each has amount, progress, expectedAmount and maxBet.
+        """
+        user = await self._user_query(
+            GraphQLQueries.ACTIVE_ROLLOVERS, "UserActiveRollovers"
+        )
         return user.get("activeRollovers") or []
 
     async def get_seed_pair(self) -> Dict[str, Any]:
@@ -1499,24 +1666,37 @@ class StakeAPI:
             if (entry.get("bet") or {}).get("__typename") == "SportBet"
         ]
 
-    async def get_active_sport_bets(self, limit: int = 20, offset: int = 0) -> List[Dict[str, Any]]:
+    async def get_active_sport_bets(
+        self, limit: int = 20, offset: int = 0
+    ) -> List[Dict[str, Any]]:
         """Get your open sports bets."""
         user = await self._user_query(
-            GraphQLQueries.ACTIVE_SPORT_BETS, "ActiveBets_User", {"limit": limit, "offset": offset}
+            GraphQLQueries.ACTIVE_SPORT_BETS,
+            "ActiveBets_User",
+            {"limit": limit, "offset": offset},
         )
         return user.get("activeSportBets") or []
 
-    async def get_deposits(self, limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
+    async def get_deposits(
+        self, limit: int = 10, offset: int = 0
+    ) -> List[Dict[str, Any]]:
         """Get your crypto deposits (amount, currency, chain, status, hash)."""
         user = await self._user_query(
             GraphQLQueries.DEPOSITS, "DepositList", {"limit": limit, "offset": offset}
         )
         return user.get("depositList") or []
 
-    async def get_withdrawals(self, limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
-        """Get your crypto withdrawals (amount, currency, chain, status, hash, address)."""
+    async def get_withdrawals(
+        self, limit: int = 10, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """Get your crypto withdrawals.
+
+        Each has amount, currency, chain, status, hash and address.
+        """
         user = await self._user_query(
-            GraphQLQueries.WITHDRAWALS, "WithdrawalList", {"limit": limit, "offset": offset}
+            GraphQLQueries.WITHDRAWALS,
+            "WithdrawalList",
+            {"limit": limit, "offset": offset},
         )
         return user.get("withdrawalList") or []
 
@@ -1539,7 +1719,11 @@ class StakeAPI:
         return user.get("tipHistory") or []
 
     async def get_game_statistics(
-        self, period: str = "all", sort: str = "wagered", limit: int = 20, offset: int = 0
+        self,
+        period: str = "all",
+        sort: str = "wagered",
+        limit: int = 20,
+        offset: int = 0,
     ) -> List[Dict[str, Any]]:
         """
         Get your per-game totals: bet count, wagered, profit and RTP.
@@ -1550,7 +1734,12 @@ class StakeAPI:
         """
         data = await self._graphql_request(
             GraphQLQueries.GAME_STATISTICS,
-            variables={"period": period, "sort": sort, "limit": limit, "offset": offset},
+            variables={
+                "period": period,
+                "sort": sort,
+                "limit": limit,
+                "offset": offset,
+            },
             operation_name="UserGameStatisticList",
         )
         return data.get("userGameStatisticList") or []
@@ -1558,25 +1747,39 @@ class StakeAPI:
     async def get_favourite_games(self, limit: int = 50, offset: int = 0) -> List[Game]:
         """Get the casino games you marked as favourite."""
         user = await self._user_query(
-            GraphQLQueries.FAVOURITE_GAMES, "UserFavouriteGames", {"limit": limit, "offset": offset}
+            GraphQLQueries.FAVOURITE_GAMES,
+            "UserFavouriteGames",
+            {"limit": limit, "offset": offset},
         )
-        return [g for g in map(_game_from_kurator, user.get("favouriteGameList") or []) if g]
+        return [
+            g for g in map(_game_from_kurator, user.get("favouriteGameList") or []) if g
+        ]
 
     async def get_recent_games(self, limit: int = 20, offset: int = 0) -> List[Game]:
         """Get the casino games you played most recently."""
         user = await self._user_query(
-            GraphQLQueries.RECENT_GAMES, "UserRecentGameList", {"limit": limit, "offset": offset}
+            GraphQLQueries.RECENT_GAMES,
+            "UserRecentGameList",
+            {"limit": limit, "offset": offset},
         )
-        return [g for g in map(_game_from_kurator, user.get("recentGameList") or []) if g]
+        return [
+            g for g in map(_game_from_kurator, user.get("recentGameList") or []) if g
+        ]
 
-    async def get_race_positions(self, limit: int = 20, offset: int = 0) -> List[Dict[str, Any]]:
+    async def get_race_positions(
+        self, limit: int = 20, offset: int = 0
+    ) -> List[Dict[str, Any]]:
         """Get your finishing positions and payouts in past and current races."""
         user = await self._user_query(
-            GraphQLQueries.RACE_POSITIONS, "UserRacePositionList", {"limit": limit, "offset": offset}
+            GraphQLQueries.RACE_POSITIONS,
+            "UserRacePositionList",
+            {"limit": limit, "offset": offset},
         )
         return user.get("racePositionList") or []
 
-    async def get_notifications(self, limit: int = 20, offset: int = 0) -> List[Dict[str, Any]]:
+    async def get_notifications(
+        self, limit: int = 20, offset: int = 0
+    ) -> List[Dict[str, Any]]:
         """
         Get your notifications, newest first.
 
@@ -1585,18 +1788,25 @@ class StakeAPI:
         "NotificationUserBonus", "RacePosition", "SportBet").
         """
         user = await self._user_query(
-            GraphQLQueries.NOTIFICATIONS, "NotificationList", {"limit": limit, "offset": offset}
+            GraphQLQueries.NOTIFICATIONS,
+            "NotificationList",
+            {"limit": limit, "offset": offset},
         )
         return user.get("notificationList") or []
 
     async def get_gambling_limits(self) -> List[Dict[str, Any]]:
-        """Get the responsible-gambling limits set on your account (type, period, value, progress)."""
+        """Get the responsible-gambling limits set on your account.
+
+        Each has type, period, value and progress.
+        """
         user = await self._user_query(
             GraphQLQueries.GAMBLING_LIMITS, "ResponsibleGamblingLimitList"
         )
         return user.get("responsibleGamblingLimits") or []
 
-    async def get_sessions(self, limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
+    async def get_sessions(
+        self, limit: int = 10, offset: int = 0
+    ) -> List[Dict[str, Any]]:
         """Get your login sessions (device name, IP, location, active, last seen)."""
         user = await self._user_query(
             GraphQLQueries.SESSIONS, "SessionList", {"limit": limit, "offset": offset}

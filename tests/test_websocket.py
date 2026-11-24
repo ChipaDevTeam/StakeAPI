@@ -40,26 +40,78 @@ class FakeStakeServer:
         query = payload["query"]
         if "CrashMultiplier" in query:
             for multiplier in (1.0, 1.5, 2.25):
-                await ws.send_json({"id": sub_id, "type": "next", "payload": {
-                    "data": {"crashMultiplier": {"id": "r1", "elapsed": 100, "multiplier": multiplier}}
-                }})
+                await ws.send_json(
+                    {
+                        "id": sub_id,
+                        "type": "next",
+                        "payload": {
+                            "data": {
+                                "crashMultiplier": {
+                                    "id": "r1",
+                                    "elapsed": 100,
+                                    "multiplier": multiplier,
+                                }
+                            }
+                        },
+                    }
+                )
         elif "subscription Crash " in query:
-            await ws.send_json({"id": sub_id, "type": "next", "payload": {
-                "data": {"crash": {"event": {"__typename": "MultiplayerCrash", "id": "r1", "status": "ended"}}}
-            }})
+            await ws.send_json(
+                {
+                    "id": sub_id,
+                    "type": "next",
+                    "payload": {
+                        "data": {
+                            "crash": {
+                                "event": {
+                                    "__typename": "MultiplayerCrash",
+                                    "id": "r1",
+                                    "status": "ended",
+                                }
+                            }
+                        }
+                    },
+                }
+            )
             await ws.send_json({"id": sub_id, "type": "complete"})
         elif "ChatMessages" in query:
-            await ws.send_json({"id": sub_id, "type": "next", "payload": {
-                "data": {"chatMessages": {"id": "m1", "chatId": payload["variables"]["chatId"]}}
-            }})
+            await ws.send_json(
+                {
+                    "id": sub_id,
+                    "type": "next",
+                    "payload": {
+                        "data": {
+                            "chatMessages": {
+                                "id": "m1",
+                                "chatId": payload["variables"]["chatId"],
+                            }
+                        }
+                    },
+                }
+            )
         elif "sessionExpired" in query:
-            await ws.send_json({"id": sub_id, "type": "next", "payload": {"errors": [
-                {"message": "Please log in.", "errorType": "notAuthenticated"}
-            ]}})
+            await ws.send_json(
+                {
+                    "id": sub_id,
+                    "type": "next",
+                    "payload": {
+                        "errors": [
+                            {
+                                "message": "Please log in.",
+                                "errorType": "notAuthenticated",
+                            }
+                        ]
+                    },
+                }
+            )
         elif "badField" in query:
-            await ws.send_json({"id": sub_id, "type": "error", "payload": [
-                {"message": "Cannot query field \"badField\""}
-            ]})
+            await ws.send_json(
+                {
+                    "id": sub_id,
+                    "type": "error",
+                    "payload": [{"message": 'Cannot query field "badField"'}],
+                }
+            )
         elif "Hangup" in query:
             await ws.close()
 

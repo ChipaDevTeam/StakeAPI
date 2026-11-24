@@ -37,6 +37,7 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Python 3.10 or newer is now required.** Python 3.8 and 3.9 are end-of-life and no longer available on GitHub's CI runners; CI now tests 3.10–3.14
 - `place_bet()` now explains which per-game method to use instead of saying betting is unmapped
 - "Please log in." errors now raise `PermissionDeniedError` instead of a plain `GraphQLError`
 
