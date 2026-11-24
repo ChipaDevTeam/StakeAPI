@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from stakeapi.exceptions import PermissionDeniedError, StakeAPIError
+from stakeapi.exceptions import GraphQLError, PermissionDeniedError, StakeAPIError
 from stakeapi.models import Game
 
 
@@ -134,3 +134,60 @@ async def test_please_log_in_raises_permission_denied(stake_client):
     with patch.object(stake_client, "_request", return_value=response):
         with pytest.raises(PermissionDeniedError):
             await stake_client.get_claimable_bonuses()
+
+
+PARTIAL_VIP_RESPONSE = {
+    "data": {
+        "user": {
+            "id": "u1",
+            "flags": [],
+            "flagProgress": {"flag": "bronze", "progress": 0.4},
+            "rakeback": {"enabled": True, "balances": []},
+            "reload": None,
+            "dailyBonus": None,
+            "topUpBonus": None,
+            "vipInfo": None,
+        }
+    },
+    "errors": [
+        {"message": "topUpBonusDisabled", "path": ["user", "topUpBonus"]},
+        {"message": "dailyBonusDisabled", "path": ["user", "dailyBonus"]},
+    ],
+}
+
+
+@pytest.mark.asyncio
+async def test_vip_info_ignores_errors_for_disabled_bonuses(stake_client):
+    with patch.object(stake_client, "_request", return_value=PARTIAL_VIP_RESPONSE):
+        vip = await stake_client.get_vip_info()
+    assert vip["flagProgress"] == {"flag": "bronze", "progress": 0.4}
+    assert vip["dailyBonus"] is None and vip["topUpBonus"] is None
+
+
+@pytest.mark.asyncio
+async def test_other_methods_still_raise_on_partial_errors(stake_client):
+    with patch.object(stake_client, "_request", return_value=PARTIAL_VIP_RESPONSE):
+        with pytest.raises(GraphQLError):
+            await stake_client.get_active_rollovers()
+
+
+@pytest.mark.asyncio
+async def test_partial_data_never_hides_a_permission_error(stake_client):
+    response = {
+        "data": {"user": None},
+        "errors": [{"message": "You are not allowed to do that."}],
+    }
+    with patch.object(stake_client, "_request", return_value=response):
+        with pytest.raises(PermissionDeniedError):
+            await stake_client.get_vip_info()
+
+
+@pytest.mark.asyncio
+async def test_tip_history_refused_raises_permission_denied(stake_client):
+    response = {
+        "data": {"user": {"id": "u1", "tipHistory": None}},
+        "errors": [{"message": "You are not allowed to do that."}],
+    }
+    with patch.object(stake_client, "_request", return_value=response):
+        with pytest.raises(PermissionDeniedError):
+            await stake_client.get_tip_history(name="me")

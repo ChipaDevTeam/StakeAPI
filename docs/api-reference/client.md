@@ -412,7 +412,7 @@ These read your own account, so they need a logged-in session (access token or `
 |:-------|:--------|
 | `get_user_stats(name)` | Any player's public profile: join date, VIP flags, high-roller badges, and per-currency bet stats (`statisticScoped` is `None` if they hide them). No login needed. |
 | `get_account_status()` | KYC status, email/phone verification, ban/suspension flags, self-exclusion |
-| `get_vip_info()` | VIP rank `flags`, `flagProgress` to the next rank, `rakeback` balances, `reload`, `dailyBonus`, `topUpBonus`, and your VIP host (`vipInfo`) |
+| `get_vip_info()` | VIP rank `flags` (a list, empty at the lowest rank), `flagProgress` (one `{"flag", "progress"}` object; `progress` is a fraction from 0 to 1), `rakeback` balances, `reload`, `dailyBonus`, `topUpBonus` and your VIP host (`vipInfo`). The last four are `None` when the feature is disabled for your account. |
 | `get_claimable_bonuses()` | Self-serve bonuses you can claim now |
 | `get_unclaimed_bonuses(limit=20, offset=0)` | Bonus codes credited to you but not redeemed |
 | `get_active_rollovers()` | Wagering requirements on your bonuses (`amount`, `progress`, `expectedAmount`, `maxBet`) |
@@ -420,7 +420,7 @@ These read your own account, so they need a logged-in session (access token or `
 | `get_sport_bet_history(limit=20, offset=0, status=None)` | Your sports bets; filter `status` with `"confirmed"` (open), `"settled"`, `"cashout"`, `"cancelled"` |
 | `get_active_sport_bets(limit=20, offset=0)` | Your open sports bets |
 | `get_deposits(limit=10, offset=0)` / `get_withdrawals(limit=10, offset=0)` | Crypto deposits and withdrawals (amount, currency, chain, status, hash) |
-| `get_tip_history(limit=20, offset=0, name=None)` | Tips you sent and received |
+| `get_tip_history(limit=20, offset=0, name=None)` | Tips you sent and received. The site refuses this on some accounts even when logged in; it then raises `PermissionDeniedError`. |
 | `get_game_statistics(period="all", sort="wagered", limit=20, offset=0)` | Per-game bet count, wagered, profit and RTP. `period`: `"day"`, `"week"`, `"month"`, `"all"`. `sort`: `"wagered"`, `"profit"`, `"bets"`, `"rtp"` |
 | `get_favourite_games(limit=50, offset=0)` / `get_recent_games(limit=20, offset=0)` | `List[Game]` |
 | `get_race_positions(limit=20, offset=0)` | Your positions and payouts in races |

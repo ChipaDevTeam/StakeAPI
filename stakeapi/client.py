@@ -435,6 +435,7 @@ class StakeAPI:
         query: str,
         variables: Optional[Dict[str, Any]] = None,
         operation_name: Optional[str] = None,
+        allow_partial: bool = False,
     ) -> Dict[Any, Any]:
         """
         Make a GraphQL request to the stake.com API.
@@ -484,7 +485,16 @@ class StakeAPI:
 
         errors = response.get("errors")
         if errors:
-            self._raise_for_errors(errors)
+            # Some fields come back null with an error (e.g. a bonus that is
+            # disabled for the account) next to otherwise valid data. With
+            # allow_partial that data is returned, unless the API refused the
+            # request for permission reasons.
+            if not (
+                allow_partial
+                and response.get("data")
+                and not self._is_permission_error(errors)
+            ):
+                self._raise_for_errors(errors)
 
         data = response.get("data")
         if data is None:
@@ -495,15 +505,9 @@ class StakeAPI:
 
         return cast(Dict[str, Any], data)
 
-    def _raise_for_errors(self, errors: List[Dict[str, Any]]) -> None:
-        """Raise PermissionDeniedError or GraphQLError for an API error list."""
-        error_messages = [error.get("message", "Unknown error") for error in errors]
-        error_types = [
-            error.get("errorType") or error.get("extensions", {}).get("code", "")
-            for error in errors
-        ]
-        joined = ", ".join(error_messages)
-
+    @staticmethod
+    def _is_permission_error(errors: List[Dict[str, Any]]) -> bool:
+        """True if any API error says the caller is not allowed or not logged in."""
         permission_markers = (
             "not allowed",
             "unauthorized",
@@ -512,11 +516,21 @@ class StakeAPI:
             "notauthenticated",
             "please log in",
         )
-        if any(
-            marker in msg.lower()
-            for msg in error_messages + error_types
-            for marker in permission_markers
-        ):
+        texts = [error.get("message", "Unknown error") for error in errors]
+        texts += [
+            error.get("errorType") or error.get("extensions", {}).get("code", "")
+            for error in errors
+        ]
+        return any(
+            marker in text.lower() for text in texts for marker in permission_markers
+        )
+
+    def _raise_for_errors(self, errors: List[Dict[str, Any]]) -> None:
+        """Raise PermissionDeniedError or GraphQLError for an API error list."""
+        error_messages = [error.get("message", "Unknown error") for error in errors]
+        joined = ", ".join(error_messages)
+
+        if self._is_permission_error(errors):
             raise PermissionDeniedError(
                 f"GraphQL permission error: {joined}. This usually means: "
                 "1) your access token is invalid or expired — get a fresh one "
@@ -1541,10 +1555,14 @@ class StakeAPI:
         query: str,
         operation_name: str,
         variables: Optional[Dict[str, Any]] = None,
+        allow_partial: bool = False,
     ) -> Dict[str, Any]:
         """Run a query rooted at ``user`` and return the user object."""
         data = await self._graphql_request(
-            query, variables=variables, operation_name=operation_name
+            query,
+            variables=variables,
+            operation_name=operation_name,
+            allow_partial=allow_partial,
         )
         user = data.get("user")
         if not user:
@@ -1585,15 +1603,20 @@ class StakeAPI:
 
     async def get_vip_info(self) -> Dict[str, Any]:
         """
-        Get your VIP data: rank flags, progress to the next rank, rakeback
-        balances, reload, daily and top-up bonuses, and your VIP host.
+        Get your VIP data: rank flags, VIP progress, rakeback balances,
+        reload, daily and top-up bonuses, and your VIP host.
 
         Returns:
-            The user object with ``flags``, ``flagProgress``, ``rakeback``,
-            ``reload``, ``dailyBonus``, ``topUpBonus`` and ``vipInfo``
-            (each may be None if it does not apply to your account).
+            The user object with ``flags`` (a list, possibly empty),
+            ``flagProgress`` (one ``{"flag", "progress"}`` object, where
+            progress is a fraction between 0 and 1), ``rakeback``, ``reload``,
+            ``dailyBonus``, ``topUpBonus`` and ``vipInfo``. The last four are
+            None when the feature is disabled for your account; the site
+            reports that as an error next to the data, which is ignored here.
         """
-        return await self._user_query(GraphQLQueries.VIP_INFO, "VipMeta")
+        return await self._user_query(
+            GraphQLQueries.VIP_INFO, "VipMeta", allow_partial=True
+        )
 
     async def get_claimable_bonuses(self) -> List[Dict[str, Any]]:
         """Get self-serve bonuses you can claim now.
@@ -1713,6 +1736,10 @@ class StakeAPI:
 
         Args:
             name: Your username. Looked up from your account when omitted.
+
+        Raises:
+            PermissionDeniedError: The site refuses tip history on some
+                accounts even when logged in ("You are not allowed to do that").
         """
         if not name:
             name = (await self.get_account_status()).get("name")

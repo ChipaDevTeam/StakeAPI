@@ -41,6 +41,7 @@ This project follows [Semantic Versioning](https://semver.org/).
 - **Python 3.10 or newer is now required.** Python 3.8 and 3.9 are end-of-life and no longer available on GitHub's CI runners; CI now tests 3.10–3.14
 - `place_bet()` now explains which per-game method to use instead of saying betting is unmapped
 - "Please log in." errors now raise `PermissionDeniedError` instead of a plain `GraphQLError`
+- `get_vip_info()` no longer fails on accounts where the daily or top-up bonus is disabled; the site reports that as an error next to valid data, which is now ignored for this method (permission errors still raise)
 
 ---
 
