@@ -29,6 +29,12 @@ This is an unofficial API wrapper and is not affiliated with, endorsed by, or co
 pip install stakeapi
 ```
 
+On Debian and Ubuntu, pip refuses to install into the system Python ("externally-managed-environment"). Use a virtual environment:
+
+```bash
+python3 -m venv ~/venvs/stake && ~/venvs/stake/bin/pip install "stakeapi[browser]"
+```
+
 ## Quick Start
 
 ```python
@@ -46,7 +52,22 @@ async def main():
 asyncio.run(main())
 ```
 
-## Getting Your Access Token
+## Easiest login: reuse your own Chrome
+
+Sites like stake.com often refuse plain Python requests with a `403` from their bot protection, even with valid cookies. The reliable way is to send the requests from a real Chrome window that is logged in with your own Chrome session:
+
+```bash
+pip install "stakeapi[browser]"
+```
+
+```python
+async with StakeAPI.with_browser("https://stake.com", import_cookies_from="chrome") as client:
+    print(await client.get_user_balance())
+```
+
+Nothing is typed for you and no password leaves your machine. See the [browser login guide](https://chipadevteam.github.io/StakeAPI/guides/browser-login/).
+
+## Getting Your Access Token (plain client)
 
 1. **Log in to stake.com** in your browser
 2. **Open Developer Tools** (F12)

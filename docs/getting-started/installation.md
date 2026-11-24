@@ -31,6 +31,17 @@ This installs StakeAPI and all required dependencies:
 | `websockets` ≥ 10.0 | Real-time WebSocket connections |
 | `cryptography` ≥ 3.4.8 | Secure token handling |
 
+## Install the browser tools
+
+Chrome login and cookie import need two extra packages (selenium and browser-cookie3):
+
+```bash
+pip install "stakeapi[browser]"
+```
+
+{: .note }
+> On Debian and Ubuntu, `pip install` into the system Python fails with `externally-managed-environment`. Create a virtual environment first (see below), or use `pipx install "stakeapi[browser]"` for the `stakeapi-login` and `stakeapi-cookies` commands.
+
 ## Install from Source
 
 If you want the latest development version:

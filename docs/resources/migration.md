@@ -32,7 +32,7 @@ StakeAPI follows [Semantic Versioning](https://semver.org/):
 pip install --upgrade stakeapi
 
 # Upgrade to specific version
-pip install stakeapi==0.2.0
+pip install stakeapi==0.2.1
 
 # Check current version
 python -c "import stakeapi; print(stakeapi.__version__)"
