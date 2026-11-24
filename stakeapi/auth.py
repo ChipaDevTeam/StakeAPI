@@ -1,7 +1,8 @@
 """Authentication manager for StakeAPI."""
 
+import json
 import time
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional
 
 
 class AuthManager:
@@ -125,25 +126,37 @@ class AuthManager:
         return cookies
 
     @staticmethod
-    def load_cookie_file(path: str) -> str:
+    def load_cookie_file(path: str, domain: Optional[str] = None) -> str:
         """
-        Load a raw cookie string from a file (e.g. cookie.txt).
+        Load cookies from a file and return them as one Cookie header string.
 
-        The file should contain the entire Cookie header value copied from
-        the browser. Returns the cleaned, single-line cookie string.
+        Two formats are accepted:
+
+        - The raw Cookie header copied from the browser (e.g. cookie.txt):
+          ``name1=value1; name2=value2``, optionally prefixed with ``Cookie:``.
+        - A browser-extension JSON export (e.g. cookies.json): a list of
+          objects with at least ``name`` and ``value``, plus optional
+          ``domain`` and ``expirationDate``. A plain ``{"name": "value"}``
+          object also works.
 
         Args:
             path: Path to the cookie file
+            domain: For JSON exports, keep only cookies that apply to this
+                host (e.g. "stake1017.com"). Expired cookies are always dropped.
 
         Returns:
             Cleaned cookie header string
 
         Raises:
             OSError: If the file cannot be read
-            ValueError: If the file is empty
+            ValueError: If the file is empty, is malformed JSON, or has no
+                usable cookies for ``domain``
         """
         with open(path, "r", encoding="utf-8") as f:
             raw = f.read()
+
+        if raw.lstrip().startswith(("[", "{")):
+            return AuthManager._cookie_header_from_json(raw, path, domain)
 
         cleaned = " ".join(line.strip() for line in raw.splitlines()).strip()
         if cleaned.lower().startswith("cookie:"):
@@ -151,6 +164,58 @@ class AuthManager:
         if not cleaned:
             raise ValueError(f"Cookie file {path!r} is empty")
         return cleaned
+
+    @staticmethod
+    def _cookie_header_from_json(raw: str, path: str, domain: Optional[str]) -> str:
+        """Build a Cookie header from a JSON cookie export."""
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Cookie file {path!r} is not valid JSON: {e}")
+
+        if isinstance(data, dict):
+            entries: List[Dict[str, Any]] = [
+                {"name": k, "value": v} for k, v in data.items()
+            ]
+        elif isinstance(data, list):
+            entries = [c for c in data if isinstance(c, dict)]
+        else:
+            raise ValueError(
+                f"Cookie file {path!r} must hold a list of cookies or a "
+                "name → value object"
+            )
+
+        now = time.time()
+        host = (domain or "").lower().lstrip(".")
+        pairs: List[str] = []
+        domains = set()
+        for cookie in entries:
+            name, value = cookie.get("name"), cookie.get("value")
+            if not name or value is None:
+                continue
+            expires = cookie.get("expirationDate")
+            if isinstance(expires, (int, float)) and expires < now:
+                continue
+            cookie_domain = str(cookie.get("domain") or "").lower().lstrip(".")
+            if cookie_domain:
+                domains.add(cookie_domain)
+            if (
+                host
+                and cookie_domain
+                and not (host == cookie_domain or host.endswith("." + cookie_domain))
+            ):
+                continue
+            pairs.append(f"{name}={value}")
+
+        if not pairs:
+            if host and domains:
+                raise ValueError(
+                    f"Cookie file {path!r} has no unexpired cookies for {host!r} "
+                    f"(it has cookies for: {', '.join(sorted(domains))}). Export "
+                    "the cookies from the same domain you pass as base_url."
+                )
+            raise ValueError(f"Cookie file {path!r} has no usable cookies")
+        return "; ".join(pairs)
 
     @staticmethod
     def extract_access_token_from_curl(curl_command: str) -> Optional[str]:

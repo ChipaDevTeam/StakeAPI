@@ -144,6 +144,23 @@ async with StakeAPI(
     pass
 ```
 
+### Cookie File
+
+The simplest setup is to hand StakeAPI all of your browser's cookies for the site. Two file formats work:
+
+- **`cookie.txt`**: the whole `cookie` request header, copied from DevTools → Network → any request to the site.
+- **`cookies.json`**: a JSON export from a cookie extension such as Cookie-Editor or EditThisCookie (a list of objects with `name`, `value`, `domain` and `expirationDate`).
+
+```python
+async with StakeAPI(base_url="https://stake1017.com", cookie_file="cookies.json") as client:
+    print(await client.get_account_status())
+```
+
+Your access token is read from the `session` cookie, so you don't need to pass it separately. From a JSON export, StakeAPI only sends cookies whose domain matches `base_url` and skips expired ones. If none match, it raises `ValidationError` naming the domains the file does have cookies for.
+
+{: .warning }
+> A cookie file is a live login. Keep it out of git (add `cookie.txt` and `cookies.json` to `.gitignore`), and log out of that session in your browser if the file leaks.
+
 ### Using AuthManager
 
 For advanced token management:
@@ -188,6 +205,8 @@ headers = await auth.get_auth_headers()
 *.env
 config.py
 secrets.py
+cookie.txt
+cookies.json
 ```
 
 ## Handling Token Expiration

@@ -31,6 +31,7 @@ This project follows [Semantic Versioning](https://semver.org/).
 - `get_public_chats()` lists public chat rooms
 - **Account data**: `get_account_status()`, `get_vip_info()`, `get_claimable_bonuses()`, `get_unclaimed_bonuses()`, `get_active_rollovers()`, `get_seed_pair()`, `get_sport_bet_history()`, `get_active_sport_bets()`, `get_deposits()`, `get_withdrawals()`, `get_tip_history()`, `get_game_statistics()`, `get_favourite_games()`, `get_recent_games()`, `get_race_positions()`, `get_notifications()`, `get_gambling_limits()` and `get_sessions()`
 - `get_user_stats(name)` looks up any player's public profile without logging in
+- `cookie_file` accepts a cookie-extension JSON export (e.g. `cookies.json`) as well as the raw Cookie header; only cookies for `base_url`'s domain are used and expired ones are skipped
 - `get_bet_history()` takes `offset` and a `game` filter
 
 - **Betting (unvalidated)**: `dice_roll()`, `casino_bet()` for any Stake Original, `crash_bet()`, `crash_cashout()`, `slide_bet()`, `flip_bet()`, `flip_next()`, `flip_cashout()`, `zoo_bet()`, `place_sport_bet()` and `cashout_sport_bet()`. They are off unless the client is created with `allow_betting=True` (`BettingDisabledError` otherwise), and all support `dry_run=True`

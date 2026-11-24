@@ -5,8 +5,9 @@ This script demonstrates how to use the StakeAPI client for common operations.
 
 Authentication (same as balance.py):
   - Easiest: put the entire Cookie header from your browser in ./cookie.txt
-    (DevTools → Network tab → any request → copy the 'cookie' header),
-    or point STAKE_COOKIE_FILE at the file.
+    (DevTools → Network tab → any request → copy the 'cookie' header), or
+    save a cookie-extension JSON export as ./cookies.json, or point
+    STAKE_COOKIE_FILE at either file.
   - Or set STAKE_ACCESS_TOKEN / STAKE_SESSION_COOKIE / STAKE_CF_CLEARANCE in .env.
   - If stake.com is blocked in your country, set STAKE_BASE_URL to a mirror,
     e.g. STAKE_BASE_URL=https://stake1017.com
@@ -30,11 +31,15 @@ from stakeapi.exceptions import (
 dotenv.load_dotenv()
 
 
+# Checked in order when STAKE_COOKIE_FILE is not set
+COOKIE_FILES = ("cookie.txt", "cookies.json")
+
+
 def make_client() -> StakeAPI:
-    """Build a StakeAPI client from environment variables / cookie.txt."""
-    cookie_file = os.getenv("STAKE_COOKIE_FILE")
-    if not cookie_file and os.path.exists("cookie.txt"):
-        cookie_file = "cookie.txt"
+    """Build a StakeAPI client from environment variables / cookie files."""
+    cookie_file = os.getenv("STAKE_COOKIE_FILE") or next(
+        (f for f in COOKIE_FILES if os.path.exists(f)), None
+    )
 
     return StakeAPI(
         access_token=os.getenv("STAKE_ACCESS_TOKEN"),
@@ -51,7 +56,7 @@ def has_credentials() -> bool:
     return bool(
         os.getenv("STAKE_ACCESS_TOKEN")
         or os.getenv("STAKE_COOKIE_FILE")
-        or os.path.exists("cookie.txt")
+        or any(os.path.exists(f) for f in COOKIE_FILES)
     )
 
 
@@ -60,7 +65,8 @@ async def basic_usage_example():
 
     if not has_credentials():
         print(
-            "No credentials found — create cookie.txt or set STAKE_ACCESS_TOKEN in .env"
+            "No credentials found — create cookie.txt or cookies.json, "
+            "or set STAKE_ACCESS_TOKEN in .env"
         )
         return
 
@@ -101,7 +107,7 @@ async def basic_usage_example():
         except PermissionDeniedError as e:
             print(f"Permission denied: {e}")
         except AuthenticationError:
-            print("Authentication failed. Refresh your cookie.txt / access token.")
+            print("Authentication failed. Refresh your cookie file / access token.")
         except NetworkError as e:
             print(f"Network problem: {e}")
         except StakeAPIError as e:
@@ -113,7 +119,8 @@ async def live_data_example():
 
     if not has_credentials():
         print(
-            "No credentials found — create cookie.txt or set STAKE_ACCESS_TOKEN in .env"
+            "No credentials found — create cookie.txt or cookies.json, "
+            "or set STAKE_ACCESS_TOKEN in .env"
         )
         return
 
@@ -146,7 +153,8 @@ async def betting_example():
 
     if not has_credentials():
         print(
-            "No credentials found — create cookie.txt or set STAKE_ACCESS_TOKEN in .env"
+            "No credentials found — create cookie.txt or cookies.json, "
+            "or set STAKE_ACCESS_TOKEN in .env"
         )
         return
 

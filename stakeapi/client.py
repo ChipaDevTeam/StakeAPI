@@ -6,7 +6,7 @@ import uuid
 from decimal import Decimal
 from types import TracebackType
 from typing import Any, Dict, List, Optional, Tuple, Type, cast
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 import aiohttp
 
@@ -181,11 +181,14 @@ class StakeAPI:
                 domain you set here.
             timeout: Request timeout in seconds
             rate_limit: Maximum requests per second
-            cookie_file: Path to a file (e.g. "cookie.txt") containing the
-                entire Cookie header copied from your browser (DevTools →
-                Network tab → any request → 'cookie' header). All cookies are
-                sent as-is, and session/cf_clearance/access token are extracted
-                automatically. Takes precedence over cookie_string.
+            cookie_file: Path to a cookie file: either the entire Cookie header
+                copied from your browser (DevTools → Network tab → any request
+                → 'cookie' header), e.g. "cookie.txt", or a JSON export from a
+                cookie extension, e.g. "cookies.json" (only cookies for
+                base_url's domain are used; expired ones are skipped). All
+                cookies are sent as-is, and session/cf_clearance/access token
+                are extracted automatically. Takes precedence over
+                cookie_string.
             cookie_string: The same raw cookie string, passed directly instead
                 of via a file.
             allow_betting: Must be True for any method that places or cashes
@@ -209,7 +212,9 @@ class StakeAPI:
         self._cookie_header: Optional[str] = None
         if cookie_file:
             try:
-                self._cookie_header = AuthManager.load_cookie_file(cookie_file)
+                self._cookie_header = AuthManager.load_cookie_file(
+                    cookie_file, domain=urlparse(base_url).hostname
+                )
             except OSError as e:
                 raise ValidationError(
                     f"Could not read cookie file {cookie_file!r}: {e}. "
