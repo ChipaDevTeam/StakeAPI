@@ -3,9 +3,10 @@
 import asyncio
 import json
 import uuid
+from dataclasses import dataclass
 from decimal import Decimal
 from types import TracebackType
-from typing import Any, Dict, List, Optional, Tuple, Type, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, cast
 from urllib.parse import urljoin, urlparse
 
 import aiohttp
@@ -24,6 +25,9 @@ from .exceptions import (
 )
 from .models import Bet, Game, SportEvent, User
 from .websocket import StakeWebSocket
+
+if TYPE_CHECKING:
+    from .browser import BrowserSession
 
 
 def _parse_datetime(value: Optional[str]) -> Any:
@@ -147,6 +151,15 @@ def _game_from_kurator(game: Dict[str, Any]) -> Optional[Game]:
         return None
 
 
+@dataclass
+class _Reply:
+    """An HTTP response from either transport (aiohttp or the browser)."""
+
+    status: int
+    headers: Dict[str, str]  # header names are lower-case
+    text: str
+
+
 class StakeAPI:
     """Main client for interacting with stake.com API."""
 
@@ -162,6 +175,7 @@ class StakeAPI:
         cookie_file: Optional[str] = None,
         cookie_string: Optional[str] = None,
         allow_betting: bool = False,
+        browser: Optional["BrowserSession"] = None,
     ):
         """
         Initialize the StakeAPI client.
@@ -191,6 +205,9 @@ class StakeAPI:
                 cookie_string.
             cookie_string: The same raw cookie string, passed directly instead
                 of via a file.
+            browser: A BrowserSession. When given, requests are sent from inside
+                that logged-in Chrome window instead of over plain HTTP; see
+                StakeAPI.with_browser().
             allow_betting: Must be True for any method that places or cashes
                 out a real-money bet. Off by default so a script cannot bet by
                 accident; every bet method also supports dry_run=True.
@@ -222,6 +239,8 @@ class StakeAPI:
         self._cookie_file = cookie_file
         self._cookie_header: Optional[str] = None
         self._session: Optional[aiohttp.ClientSession] = None
+        self._browser = browser
+        self._browser_login_timeout = 300.0
         self._load_cookies(cookie_file, cookie_string)
 
     @property
@@ -317,11 +336,14 @@ class StakeAPI:
                 "reload_cookies() needs the client to be created with cookie_file=..."
             )
         self._load_cookies(self._cookie_file, None, refresh=True)
-        await self.close()
+        await self._reset_session()
 
     async def __aenter__(self) -> "StakeAPI":
         """Async context manager entry."""
-        await self._create_session()
+        if self._browser is not None:
+            await self._start_browser()
+        else:
+            await self._create_session()
         return self
 
     async def __aexit__(
@@ -394,16 +416,121 @@ class StakeAPI:
         """
         return StakeWebSocket(self, language=language)
 
-    async def close(self) -> None:
-        """Close the session. The client reconnects on the next request."""
+    async def _reset_session(self) -> None:
+        """Drop the HTTP session; the next request opens a new one."""
         if self._session:
             await self._session.close()
             self._session = None
 
-    async def _forbidden_error(self, response: aiohttp.ClientResponse) -> StakeAPIError:
+    async def close(self) -> None:
+        """Close the session and the browser window, if any.
+
+        An HTTP client reconnects on the next request.
+        """
+        await self._reset_session()
+        if self._browser is not None and self._browser.started:
+            await asyncio.to_thread(self._browser.close)
+
+    @classmethod
+    def with_browser(
+        cls,
+        base_url: str = "https://stake.com",
+        *,
+        login_timeout: float = 300.0,
+        **browser_options: Any,
+    ) -> "StakeAPI":
+        """
+        A client that sends every request from inside a real Chrome window.
+
+        Entering ``async with`` opens Chrome at the login page and waits for you
+        to log in (nothing is typed for you). After that the library works,
+        because the site sees ordinary requests from a logged-in browser tab.
+        The login is kept in a Chrome profile folder, so later runs skip it.
+
+        Needs ``pip install "stakeapi[browser]"`` and Chrome.
+
+        Args:
+            base_url: The site or mirror, e.g. "https://stake1017.com"
+            login_timeout: Seconds to wait for you to log in. 0 skips the wait,
+                which is enough for public data.
+            **browser_options: Passed to BrowserSession (profile_dir, headless,
+                chrome_binary, chromedriver_path, import_cookies_from, ...)
+
+        Example:
+            async with StakeAPI.with_browser("https://stake1017.com") as client:
+                print(await client.get_account_status())
+        """
+        from .browser import BrowserSession
+
+        client = cls(
+            base_url=base_url, browser=BrowserSession(base_url, **browser_options)
+        )
+        client._browser_login_timeout = login_timeout
+        return client
+
+    @classmethod
+    def from_chrome(
+        cls,
+        base_url: str = "https://stake.com",
+        *,
+        browser: str = "chrome",
+        profile: Optional[str] = None,
+        **kwargs: Any,
+    ) -> "StakeAPI":
+        """
+        A plain HTTP client that uses the cookies of your own Chrome.
+
+        Reads the Stake cookies from Chrome's profile on this computer (only
+        for ``base_url``'s domain). Because the requests are not made by a
+        browser, the site's bot protection may still refuse logged-in calls;
+        use with_browser() if it does.
+
+        Needs ``pip install "stakeapi[browser]"``.
+
+        Args:
+            browser: "chrome", "chromium", "brave", "edge", ...
+            profile: Profile folder name such as "Profile 2". By default the
+                profile that is logged in to the site is used.
+        """
+        from .chrome_cookies import load_chrome_cookies
+
+        imported = load_chrome_cookies(
+            urlparse(base_url).hostname or "", browser=browser, profile=profile
+        )
+        header = "; ".join(f"{c['name']}={c['value']}" for c in imported.cookies)
+        return cls(base_url=base_url, cookie_string=header, **kwargs)
+
+    async def _start_browser(self) -> None:
+        """Open the browser if needed and wait until you are logged in."""
+        browser = cast("BrowserSession", self._browser)
+        if not browser.started:
+            await asyncio.to_thread(browser.start)
+        if self._browser_login_timeout > 0:
+            await asyncio.to_thread(browser.wait_for_login, self._browser_login_timeout)
+        await self._refresh_credentials()
+
+    async def _refresh_credentials(self) -> None:
+        """Copy the login, Cloudflare cookie and User-Agent from the browser."""
+        if self._browser is None or not self._browser.started:
+            return
+        browser = self._browser
+
+        def read() -> Tuple[List[Dict[str, Any]], str, str]:
+            return browser.cookies(), browser.cookie_header(), browser.user_agent()
+
+        cookies, header, user_agent = await asyncio.to_thread(read)
+        values = {c["name"]: c["value"] for c in cookies}
+        self._cookie_header = header or None
+        self.user_agent = user_agent or self.user_agent
+        self.session_cookie = values.get("session", self.session_cookie)
+        self.cf_clearance = values.get("cf_clearance", self.cf_clearance)
+        if not self._explicit_token:
+            self.access_token = values.get("session", self.access_token)
+
+    def _forbidden_error(self, reply: _Reply) -> StakeAPIError:
         """Build a 403 error that says who blocked the request and what to check."""
-        body = (await response.text(errors="replace"))[:3000].lower()
-        headers = {k.lower(): v for k, v in response.headers.items()}
+        body = reply.text[:3000].lower()
+        headers = reply.headers
         if any(m in body for m in ("cf-error-details", "attention required")):
             source = "a Cloudflare block page"
         elif "just a moment" in body or "cf-mitigated" in headers:
@@ -412,6 +539,18 @@ class StakeAPI:
             source = "Kasada bot protection"
         else:
             source = "the site's bot protection"
+
+        if self._browser is not None:
+            hints = [
+                "The request was made from the automated Chrome window and was "
+                "still refused: the site may block automated browsers or this "
+                "network. Make sure the window shows the site logged in, or try "
+                "once in a normal Chrome. This library adds no stealth."
+            ]
+            return StakeAPIError(
+                f"403 Forbidden from {self.base_url}: blocked by {source}. "
+                + " ".join(hints)
+            )
 
         hints = []
         if not self._cookie_header and not self.cf_clearance:
@@ -435,12 +574,47 @@ class StakeAPI:
             "that earned the cookies: use the same network, and pass "
             f"user_agent= with that browser's exact User-Agent (now: "
             f"{self.user_agent or 'library default'!r}). A script can still be "
-            "refused even with valid cookies; this library does not work around that."
+            "refused even with valid cookies. Use StakeAPI.with_browser() to send "
+            "requests from a real logged-in Chrome window; this library does not "
+            "work around bot protection."
         )
         return StakeAPIError(
             f"403 Forbidden from {self.base_url}: blocked by {source}. "
             + " ".join(hints)
         )
+
+    async def _send(
+        self,
+        method: str,
+        url: str,
+        params: Optional[Dict[str, Any]],
+        data: Optional[Dict[str, Any]],
+        headers: Dict[str, str],
+    ) -> _Reply:
+        """Send one request over the active transport and return the raw reply."""
+        if self._browser is not None:
+            browser = self._browser
+            if not browser.started:
+                await self._start_browser()
+            status, reply_headers, text = await asyncio.to_thread(
+                browser.fetch, method, url, params, data, headers
+            )
+            return _Reply(
+                status, {k.lower(): v for k, v in reply_headers.items()}, text
+            )
+
+        if not self._session:
+            await self._create_session()
+        session = cast(aiohttp.ClientSession, self._session)
+        async with session.request(
+            method, url, params=params, json=data, headers=headers
+        ) as response:
+            text = await response.text(errors="replace")
+            return _Reply(
+                response.status,
+                {k.lower(): v for k, v in response.headers.items()},
+                text,
+            )
 
     async def _request(
         self,
@@ -452,6 +626,9 @@ class StakeAPI:
     ) -> Dict[Any, Any]:
         """
         Make an authenticated request to the API.
+
+        The request goes over plain HTTP, or through the browser window when the
+        client was created with a browser.
 
         Args:
             method: HTTP method
@@ -468,10 +645,6 @@ class StakeAPI:
             RateLimitError: For rate limit errors
             NetworkError: For connection failures, timeouts, and non-JSON responses
         """
-        if not self._session:
-            await self._create_session()
-        session = cast(aiohttp.ClientSession, self._session)
-
         url = urljoin(self.base_url + "/", endpoint.lstrip("/"))
 
         # Sent per request, not baked into the session, so set_access_token()
@@ -483,48 +656,7 @@ class StakeAPI:
             request_headers["X-Access-Token"] = self.access_token
 
         try:
-            async with session.request(
-                method, url, params=params, json=data, headers=request_headers
-            ) as response:
-                if response.status == 403:
-                    raise await self._forbidden_error(response)
-                elif response.status == 401:
-                    raise AuthenticationError(
-                        "Invalid access token or unauthorized access (401). "
-                        "Your token may have expired: copy a fresh one, then call "
-                        "set_access_token() or reload_cookies()."
-                    )
-                elif response.status == 429:
-                    retry_after = response.headers.get("Retry-After")
-                    message = "Rate limit exceeded"
-                    if retry_after:
-                        message += f" — retry after {retry_after} seconds"
-                    raise RateLimitError(message)
-                elif response.status >= 500:
-                    raise StakeAPIError(
-                        f"Server error {response.status} from {self.base_url}. "
-                        "The site may be down or the mirror may be unavailable — "
-                        "try again later or switch base_url to another mirror."
-                    )
-
-                try:
-                    response_data = await response.json(content_type=None)
-                except (json.JSONDecodeError, aiohttp.ContentTypeError, ValueError):
-                    body_preview = (await response.text())[:200]
-                    raise NetworkError(
-                        "Expected JSON but got a non-JSON response "
-                        f"(status {response.status}) from {url}. This usually "
-                        "means a Cloudflare challenge page or a redirect to a "
-                        f"login page. Response starts with: {body_preview!r}"
-                    )
-
-                if response.status >= 400:
-                    raise StakeAPIError(
-                        f"API error: {response.status} - {response_data}"
-                    )
-
-                return cast(Dict[Any, Any], response_data)
-
+            reply = await self._send(method, url, params, data, request_headers)
         except StakeAPIError:
             raise
         except asyncio.TimeoutError:
@@ -542,6 +674,42 @@ class StakeAPI:
             )
         except aiohttp.ClientError as e:
             raise NetworkError(f"Request failed: {e}")
+
+        if reply.status == 403:
+            raise self._forbidden_error(reply)
+        elif reply.status == 401:
+            raise AuthenticationError(
+                "Invalid access token or unauthorized access (401). "
+                "Your token may have expired: copy a fresh one, then call "
+                "set_access_token() or reload_cookies()."
+            )
+        elif reply.status == 429:
+            retry_after = reply.headers.get("retry-after")
+            message = "Rate limit exceeded"
+            if retry_after:
+                message += f" — retry after {retry_after} seconds"
+            raise RateLimitError(message)
+        elif reply.status >= 500:
+            raise StakeAPIError(
+                f"Server error {reply.status} from {self.base_url}. "
+                "The site may be down or the mirror may be unavailable — "
+                "try again later or switch base_url to another mirror."
+            )
+
+        try:
+            response_data = json.loads(reply.text)
+        except ValueError:
+            raise NetworkError(
+                "Expected JSON but got a non-JSON response "
+                f"(status {reply.status}) from {url}. This usually "
+                "means a Cloudflare challenge page or a redirect to a "
+                f"login page. Response starts with: {reply.text[:200]!r}"
+            )
+
+        if reply.status >= 400:
+            raise StakeAPIError(f"API error: {reply.status} - {response_data}")
+
+        return cast(Dict[Any, Any], response_data)
 
     async def _graphql_request(
         self,
@@ -1554,7 +1722,6 @@ class StakeAPI:
         """
         data = await self._graphql_request(
             GraphQLQueries.CURRENCY_CONFIGURATION,
-            variables={"isAcp": False},
             operation_name="CurrencyConfiguration",
         )
         config = data.get("currencyConfiguration") or {}

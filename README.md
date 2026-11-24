@@ -21,6 +21,7 @@ This is an unofficial API wrapper and is not affiliated with, endorsed by, or co
 - 🔐 Secure authentication handling
 - ⚡ Async support for high performance
 - 📡 Live data over WebSocket (Crash, bet feeds, live odds, chat)
+- 🌐 Log in through a real Chrome window, or reuse your own Chrome login (`pip install "stakeapi[browser]"`)
 
 ## Installation
 

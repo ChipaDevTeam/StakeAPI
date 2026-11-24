@@ -87,6 +87,8 @@ class StakeWebSocket:
         """
         if self.connected:
             return
+        # With a browser attached, pick up its current cookies and User-Agent
+        await self._client._refresh_credentials()
         headers, cookies = self._client._session_headers()
         # Content-Type is meaningless for a WebSocket upgrade
         headers.pop("Content-Type", None)

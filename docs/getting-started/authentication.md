@@ -243,7 +243,7 @@ A 403 means the site's bot protection refused the request before it reached the 
 - **Different browser or network.** The protection checks that a request looks like the browser that earned the cookies. Run from the same network and pass `user_agent=` with that browser's exact User-Agent.
 
 {: .note }
-> Even with valid cookies a script can still be refused. Browser-issued bot-protection tokens (Kasada's `x-kpsdk-*` headers, for example) cannot be produced by this library, and it does not try to work around them. Public data and live feeds are most likely to work; logged-in calls from outside a browser may not.
+> Even with valid cookies a script can still be refused. Browser-issued bot-protection tokens (Kasada's `x-kpsdk-*` headers, for example) cannot be produced by this library, and it does not try to work around them. What does work is sending the requests from a real browser: see [Browser Login](../guides/browser-login.md), where you log in through a Chrome window, or the library reuses the login from your own Chrome.
 
 ## Checking Token Validity
 

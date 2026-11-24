@@ -391,8 +391,8 @@ class GraphQLQueries:
     # Validated against the live API — currency exchange rates (vs USD)
     # and fiat currency configuration
     CURRENCY_CONFIGURATION = """
-    query CurrencyConfiguration($isAcp: Boolean!) {
-      currencyConfiguration(isAcp: $isAcp) {
+    query CurrencyConfiguration {
+      currencyConfiguration {
         baseRates {
           currency
           baseRate

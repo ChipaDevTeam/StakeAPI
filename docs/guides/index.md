@@ -26,6 +26,7 @@ In-depth guides for every feature of StakeAPI.
 | [Error Handling](error-handling.md) | Handle errors gracefully in production apps |
 | [Rate Limiting](rate-limiting.md) | Stay within API limits and optimize throughput |
 | [WebSockets](websockets.md) | Real-time data streams and live updates |
+| [Browser Login](browser-login.md) | Log in through Chrome, or reuse your own Chrome login |
 | [Advanced Usage](advanced-usage.md) | Analytics, batch operations, and automation |
 | [Security](security.md) | Best practices for securing your application |
 | [Performance](performance.md) | Optimize your StakeAPI integration |

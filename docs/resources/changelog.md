@@ -37,9 +37,13 @@ This project follows [Semantic Versioning](https://semver.org/).
 - **Betting (unvalidated)**: `dice_roll()`, `casino_bet()` for any Stake Original, `crash_bet()`, `crash_cashout()`, `slide_bet()`, `flip_bet()`, `flip_next()`, `flip_cashout()`, `zoo_bet()`, `place_sport_bet()` and `cashout_sport_bet()`. They are off unless the client is created with `allow_betting=True` (`BettingDisabledError` otherwise), and all support `dry_run=True`
 
 - `client.set_access_token()` and `await client.reload_cookies()` replace credentials in a running client
+- **Browser login**: `StakeAPI.with_browser()` opens Chrome through chromedriver at the login page, waits for you to log in, and sends every request from inside that logged-in page, which the site's bot protection accepts. The login is kept in a Chrome profile folder. `import_cookies_from="chrome"` copies your login from your own Chrome so there is nothing to type. Needs `pip install "stakeapi[browser]"`
+- **Chrome cookie import**: `python -m stakeapi.chrome_cookies` (and `StakeAPI.from_chrome()`) read one site's cookies from your own Chrome, Chromium, Brave or Edge profile and save them to a private file; values are never printed
+- `stakeapi-login` and `stakeapi-cookies` commands
 
 ### Fixed
 
+- `get_currency_rates()` works again: the site removed the `isAcp` argument from its currency query
 - A client that was closed can be used again; it reconnects on the next request instead of failing on the closed session
 
 ### Changed
