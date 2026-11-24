@@ -91,13 +91,18 @@ async with StakeAPI(access_token="token") as client:
 
 This section will be updated as new versions are released.
 
-### v0.1.0 → v0.2.0 (Planned)
+### v0.1.0 → v0.2.0
 
-Expected changes:
+Mostly additions: public casino and sports data, WebSocket feeds, account data, betting methods, and browser login. Things that can affect existing code:
 
-- WebSocket API additions (non-breaking)
-- New methods for chat and VIP data (non-breaking)
-- Possible deprecation of some REST endpoints
+- **Python 3.10 or newer is required.** Python 3.8 and 3.9 are no longer supported.
+- **`place_bet()` still raises**, now with a message pointing to the per-game methods (`dice_roll()`, `crash_bet()`, `place_sport_bet()`, ...). Those need `StakeAPI(..., allow_betting=True)` and support `dry_run=True`.
+- **`get_casino_games()`, `get_game_details()` and `get_sports_events()` now work** instead of raising. Pass the site's slugs (`"stake-originals"`, `"stake-dice"`, `"soccer"`). The old example slug `"football"` is `"soccer"`.
+- **`Game` has two new fields**, `slug` and `player_count`.
+- **`get_bet_history()`** takes `offset` and a `game` filter.
+- **"Please log in." errors** raise `PermissionDeniedError` instead of a plain `GraphQLError`.
+- **Credentials can be changed while running**: `client.access_token`, `client.set_access_token()` and `await client.reload_cookies()` take effect on the next request, and a closed client reconnects on its next request.
+- **403 errors** now say who blocked the request and what to check. For logged-in calls that a plain script cannot make, use `StakeAPI.with_browser()` (`pip install "stakeapi[browser]"`).
 
 ### Deprecation Policy
 

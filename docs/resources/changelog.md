@@ -21,6 +21,10 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+---
+
+## [0.2.0] — 2026-11-24
+
 ### Added
 
 - **Public casino data**: `get_casino_games()` and `get_game_details()` now work (lobby groups and game slugs), plus `search_casino_games()`, `get_casino_collection()`, `get_game_payouts()`, `get_crash_history()`, `get_crash_game()`, `get_slide_history()` and `get_highroller_bets()`
