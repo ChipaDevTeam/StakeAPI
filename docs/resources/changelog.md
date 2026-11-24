@@ -36,11 +36,20 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 - **Betting (unvalidated)**: `dice_roll()`, `casino_bet()` for any Stake Original, `crash_bet()`, `crash_cashout()`, `slide_bet()`, `flip_bet()`, `flip_next()`, `flip_cashout()`, `zoo_bet()`, `place_sport_bet()` and `cashout_sport_bet()`. They are off unless the client is created with `allow_betting=True` (`BettingDisabledError` otherwise), and all support `dry_run=True`
 
+- `client.set_access_token()` and `await client.reload_cookies()` replace credentials in a running client
+
+### Fixed
+
+- A client that was closed can be used again; it reconnects on the next request instead of failing on the closed session
+
 ### Changed
 
 - **Python 3.10 or newer is now required.** Python 3.8 and 3.9 are end-of-life and no longer available on GitHub's CI runners; CI now tests 3.10–3.14
 - `place_bet()` now explains which per-game method to use instead of saying betting is unmapped
 - "Please log in." errors now raise `PermissionDeniedError` instead of a plain `GraphQLError`
+- The access token is now sent with every request instead of being fixed when the connection opens, so changing `client.access_token` takes effect. `client.access_token` and `client.session_cookie` are backed by `AuthManager`
+- A 403 error now says whether Cloudflare, Kasada or unknown protection blocked the request, and which cookie or User-Agent problems to check, instead of always blaming `cf_clearance`
+- A 401 error says how to refresh the token
 - `get_vip_info()` no longer fails on accounts where the daily or top-up bonus is disabled; the site reports that as an error next to valid data, which is now ignored for this method (permission errors still raise)
 
 ---

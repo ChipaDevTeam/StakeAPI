@@ -211,19 +211,39 @@ cookies.json
 
 ## Handling Token Expiration
 
-Tokens can expire or be invalidated. Handle this gracefully:
+Tokens can expire or be invalidated. A rejected token raises `AuthenticationError` (HTTP 401) or `PermissionDeniedError` (the GraphQL API says "not allowed" or "please log in"). Credentials are sent with every request, so you can replace them without recreating the client:
 
 ```python
 from stakeapi import StakeAPI
-from stakeapi.exceptions import AuthenticationError
+from stakeapi.exceptions import AuthenticationError, PermissionDeniedError
 
-async with StakeAPI(access_token="your_token") as client:
+async with StakeAPI(cookie_file="cookie.txt") as client:
     try:
         balance = await client.get_user_balance()
-    except AuthenticationError:
-        print("Token expired! Please get a new token from stake.com")
-        # Optionally: re-authenticate or notify user
+    except (AuthenticationError, PermissionDeniedError):
+        # Re-export your cookies into cookie.txt from the browser, then:
+        await client.reload_cookies()
+        balance = await client.get_user_balance()
 ```
+
+| Method | What it does |
+|:-------|:-------------|
+| `client.set_access_token(token)` | Use a new access token from the next request on |
+| `await client.reload_cookies()` | Re-read the `cookie_file` and use its cookies (and the `session` token) from the next request on. An access token you passed explicitly is kept. Needs `cookie_file=`. |
+
+`client.access_token` and `client.session_cookie` can also be assigned directly.
+
+## 403 Forbidden
+
+A 403 means the site's bot protection refused the request before it reached the API. The error says who blocked it (a Cloudflare block page, a Cloudflare challenge, Kasada, or unknown) and checks what it can:
+
+- **No cookies sent.** Pass `cookie_file=` with the cookies of a browser logged in to the same domain as `base_url`.
+- **No `cf_clearance`.** Cloudflare-protected mirrors need it; copy it from DevTools → Application → Cookies.
+- **Old cookies.** Some are short-lived, so re-copy them.
+- **Different browser or network.** The protection checks that a request looks like the browser that earned the cookies. Run from the same network and pass `user_agent=` with that browser's exact User-Agent.
+
+{: .note }
+> Even with valid cookies a script can still be refused. Browser-issued bot-protection tokens (Kasada's `x-kpsdk-*` headers, for example) cannot be produced by this library, and it does not try to work around them. Public data and live feeds are most likely to work; logged-in calls from outside a browser may not.
 
 ## Checking Token Validity
 

@@ -208,12 +208,56 @@ class StakeAPI:
                 "e.g. 'https://stake.com' or a mirror like 'https://stake1017.com'."
             )
 
-        # Load cookies from file/string if provided
+        self.base_url = base_url.rstrip("/")
+        self.user_agent = user_agent
+        self.timeout = timeout
+        self.rate_limit = rate_limit
+        self.allow_betting = allow_betting
+        self.cf_clearance = cf_clearance
+
+        # Credentials live in the AuthManager; access_token and session_cookie
+        # are properties on it, so changing them takes effect on the next request
+        self._auth_manager = AuthManager(access_token, session_cookie)
+        self._explicit_token = access_token is not None
+        self._cookie_file = cookie_file
         self._cookie_header: Optional[str] = None
+        self._session: Optional[aiohttp.ClientSession] = None
+        self._load_cookies(cookie_file, cookie_string)
+
+    @property
+    def access_token(self) -> Optional[str]:
+        """The x-access-token sent with every request."""
+        return self._auth_manager.access_token
+
+    @access_token.setter
+    def access_token(self, value: Optional[str]) -> None:
+        self._auth_manager.access_token = value
+
+    @property
+    def session_cookie(self) -> Optional[str]:
+        """The 'session' cookie value."""
+        return self._auth_manager.session_cookie
+
+    @session_cookie.setter
+    def session_cookie(self, value: Optional[str]) -> None:
+        self._auth_manager.session_cookie = value
+
+    def _load_cookies(
+        self,
+        cookie_file: Optional[str],
+        cookie_string: Optional[str],
+        refresh: bool = False,
+    ) -> None:
+        """
+        Read cookies from a file or string and derive the credentials from them.
+
+        At construction, values passed explicitly win over the cookies. On a
+        refresh the cookies win, except an access token that was set explicitly.
+        """
         if cookie_file:
             try:
-                self._cookie_header = AuthManager.load_cookie_file(
-                    cookie_file, domain=urlparse(base_url).hostname
+                header: Optional[str] = AuthManager.load_cookie_file(
+                    cookie_file, domain=urlparse(self.base_url).hostname
                 )
             except OSError as e:
                 raise ValidationError(
@@ -224,32 +268,56 @@ class StakeAPI:
             except ValueError as e:
                 raise ValidationError(str(e))
         elif cookie_string:
-            self._cookie_header = " ".join(cookie_string.split())
+            header = " ".join(cookie_string.split())
+        else:
+            return
 
-        if self._cookie_header:
-            parsed = AuthManager.parse_cookie_string(self._cookie_header)
-            if not parsed:
-                raise ValidationError(
-                    "No cookies could be parsed from the provided cookie data. "
-                    "Expected format: 'name1=value1; name2=value2; ...'"
-                )
-            session_cookie = session_cookie or parsed.get("session")
-            cf_clearance = cf_clearance or parsed.get("cf_clearance")
+        parsed = AuthManager.parse_cookie_string(header or "")
+        if not parsed:
+            raise ValidationError(
+                "No cookies could be parsed from the provided cookie data. "
+                "Expected format: 'name1=value1; name2=value2; ...'"
+            )
+        self._cookie_header = header
+        if refresh:
+            self.session_cookie = parsed.get("session", self.session_cookie)
+            self.cf_clearance = parsed.get("cf_clearance", self.cf_clearance)
+            if not self._explicit_token:
+                self.access_token = parsed.get("session", self.access_token)
+        else:
+            self.session_cookie = self.session_cookie or parsed.get("session")
+            self.cf_clearance = self.cf_clearance or parsed.get("cf_clearance")
             # On stake, the x-access-token header carries the same value
             # as the 'session' cookie
-            access_token = access_token or parsed.get("session")
+            self.access_token = self.access_token or parsed.get("session")
 
-        self.access_token = access_token
-        self.session_cookie = session_cookie
-        self.cf_clearance = cf_clearance
-        self.user_agent = user_agent
-        self.base_url = base_url.rstrip("/")
-        self.timeout = timeout
-        self.rate_limit = rate_limit
-        self.allow_betting = allow_betting
+    def set_access_token(self, access_token: str) -> None:
+        """
+        Replace the access token. It is used from the next request on.
 
-        self._session: Optional[aiohttp.ClientSession] = None
-        self._auth_manager = AuthManager(access_token)
+        Use this when the token is refreshed while the client is running.
+        """
+        self._explicit_token = True
+        self._auth_manager.set_access_token(access_token)
+
+    async def reload_cookies(self) -> None:
+        """
+        Re-read the cookie file and use the new cookies from the next request on.
+
+        Use this in a long-running script after you re-export cookies from your
+        browser, instead of recreating the client. An access token that was
+        passed explicitly is kept.
+
+        Raises:
+            ValidationError: If the client was not created with cookie_file, or
+                the file is unreadable or has no usable cookies.
+        """
+        if not self._cookie_file:
+            raise ValidationError(
+                "reload_cookies() needs the client to be created with cookie_file=..."
+            )
+        self._load_cookies(self._cookie_file, None, refresh=True)
+        await self.close()
 
     async def __aenter__(self) -> "StakeAPI":
         """Async context manager entry."""
@@ -327,9 +395,52 @@ class StakeAPI:
         return StakeWebSocket(self, language=language)
 
     async def close(self) -> None:
-        """Close the session."""
+        """Close the session. The client reconnects on the next request."""
         if self._session:
             await self._session.close()
+            self._session = None
+
+    async def _forbidden_error(self, response: aiohttp.ClientResponse) -> StakeAPIError:
+        """Build a 403 error that says who blocked the request and what to check."""
+        body = (await response.text(errors="replace"))[:3000].lower()
+        headers = {k.lower(): v for k, v in response.headers.items()}
+        if any(m in body for m in ("cf-error-details", "attention required")):
+            source = "a Cloudflare block page"
+        elif "just a moment" in body or "cf-mitigated" in headers:
+            source = "a Cloudflare challenge"
+        elif "kpsdk" in body or any(k.startswith("x-kpsdk") for k in headers):
+            source = "Kasada bot protection"
+        else:
+            source = "the site's bot protection"
+
+        hints = []
+        if not self._cookie_header and not self.cf_clearance:
+            hints.append(
+                "No cookies were sent. Pass cookie_file= with the cookies of a "
+                f"browser that is logged in to {self.base_url}."
+            )
+        elif (
+            "cf_clearance" not in (self._cookie_header or "") and not self.cf_clearance
+        ):
+            hints.append(
+                "Your cookies have no cf_clearance. If the block is Cloudflare's, "
+                "copy it from DevTools → Application → Cookies."
+            )
+        hints.append(
+            "Cookies must come from the SAME domain as base_url, and some are "
+            "short-lived (re-copy them if they are old)."
+        )
+        hints.append(
+            "The protection also checks that the request looks like the browser "
+            "that earned the cookies: use the same network, and pass "
+            f"user_agent= with that browser's exact User-Agent (now: "
+            f"{self.user_agent or 'library default'!r}). A script can still be "
+            "refused even with valid cookies; this library does not work around that."
+        )
+        return StakeAPIError(
+            f"403 Forbidden from {self.base_url}: blocked by {source}. "
+            + " ".join(hints)
+        )
 
     async def _request(
         self,
@@ -363,23 +474,25 @@ class StakeAPI:
 
         url = urljoin(self.base_url + "/", endpoint.lstrip("/"))
 
+        # Sent per request, not baked into the session, so set_access_token()
+        # and reload_cookies() apply immediately
+        request_headers = dict(headers or {})
+        if self.access_token and "x-access-token" not in {
+            k.lower() for k in request_headers
+        }:
+            request_headers["X-Access-Token"] = self.access_token
+
         try:
             async with session.request(
-                method, url, params=params, json=data, headers=headers
+                method, url, params=params, json=data, headers=request_headers
             ) as response:
                 if response.status == 403:
-                    raise StakeAPIError(
-                        "403 Forbidden — Cloudflare is blocking the request to "
-                        f"{self.base_url}. Make sure you provide a valid "
-                        "'cf_clearance' cookie obtained from the SAME domain "
-                        f"({self.base_url}). To get it: open {self.base_url} in "
-                        "your browser → DevTools (F12) → Application tab → "
-                        "Cookies → copy the 'cf_clearance' value. Then pass it "
-                        "as: StakeAPI(access_token=..., cf_clearance='...')"
-                    )
+                    raise await self._forbidden_error(response)
                 elif response.status == 401:
                     raise AuthenticationError(
-                        "Invalid access token or unauthorized access"
+                        "Invalid access token or unauthorized access (401). "
+                        "Your token may have expired: copy a fresh one, then call "
+                        "set_access_token() or reload_cookies()."
                     )
                 elif response.status == 429:
                     retry_after = response.headers.get("Retry-After")
