@@ -1,6 +1,6 @@
 """Custom exceptions for StakeAPI."""
 
-from typing import Optional
+from typing import Any, Optional
 
 
 class StakeAPIError(Exception):
@@ -36,7 +36,7 @@ class GraphQLError(StakeAPIError):
 
     def __init__(self, message: str, errors: Optional[list] = None):
         super().__init__(message)
-        self.errors = errors or []
+        self.errors: list[Any] = errors or []
 
 
 class PermissionDeniedError(GraphQLError):
